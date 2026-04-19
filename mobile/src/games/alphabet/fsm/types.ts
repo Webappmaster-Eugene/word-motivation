@@ -10,6 +10,11 @@ export interface AttemptStats {
   readonly autoAdvanced: number;
 }
 
+export interface CurrentWordStats {
+  readonly wrong: number;
+  readonly autoAdvanced: boolean;
+}
+
 export interface AlphabetContext {
   readonly words: readonly WordEntry[];
   readonly wordIndex: number;
@@ -18,6 +23,23 @@ export interface AlphabetContext {
   readonly wordRetries: number;
   readonly mode: LetterMode;
   readonly stats: AttemptStats;
+  readonly currentWordStats: CurrentWordStats;
+  /** Сколько звёзд получено за ПОСЛЕДНЕЕ завершённое слово. Показывается UI. */
+  readonly lastWordStars: number;
+  /** Всего звёзд за сессию. */
+  readonly totalStars: number;
+}
+
+/**
+ * 3 звезды — безупречно (без ошибок и без авто-продвижений).
+ * 2 звезды — 1-2 ошибки, без авто-продвижений.
+ * 1 звезда — 3+ ошибок или любое авто-продвижение (fail-soft).
+ */
+export function starsForWord(stats: CurrentWordStats): number {
+  if (stats.autoAdvanced) return 1;
+  if (stats.wrong === 0) return 3;
+  if (stats.wrong <= 2) return 2;
+  return 1;
 }
 
 export type AlphabetEvent =

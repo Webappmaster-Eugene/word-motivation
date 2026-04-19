@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Пользователи
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Child {
+  id           String   @id @default(uuid()) @db.Uuid
+  deviceIdHash String   @unique
+  ageBand      AgeBand  @default(AGE_6_8)
+  prefs        Json     @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions Session[]
+  unlocked UnlockedAnimal[]
+
+  @@map("children")
+}
+
+enum AgeBand {
+  AGE_6_8
+  AGE_9_12
+
+  @@map("age_band")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Контент (version-managed catalog)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum Biome {
+  FARM
+  FOREST
+  SAVANNA
+  SEA
+  JUNGLE
+  ARCTIC
+
+  @@map("biome")
+}
+
+enum ContentLicense {
+  CC0
+  CC_BY
+  CC_BY_SA
+  PROPRIETARY
+
+  @@map("content_license")
+}
+
+model ContentAnimal {
+  id              String         @id
+  title           String
+  biome           Biome
+  emoji           String
+  color           String
+  glbUrl          String?
+  thumbnailUrl    String?
+  systemPrompt    String
+  scriptedReplies Json           @default("[]")
+  license         ContentLicense @default(CC0)
+  attribution     String?
+  minAge          Int            @default(6)
+  version         Int            @default(1)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  words      ContentWord[]
+  unlockedBy UnlockedAnimal[]
+
+  @@map("content_animals")
+}
+
+model ContentWord {
+  id          String   @id
+  word        String
+  letters     String[]
+  animalId    String
+  letterHints Json     @default("{}")
+  minAge      Int      @default(6)
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  animal   ContentAnimal @relation(fields: [animalId], references: [id], onDelete: Restrict)
+  attempts Attempt[]
+
+  @@index([animalId])
+  @@map("content_words")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Прогресс
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Session {
+  id           String    @id @default(uuid()) @db.Uuid
+  childId      String    @db.Uuid
+  gameId       String
+  startedAt    DateTime  @default(now())
+  endedAt      DateTime?
+  fsmSnapshot  Json?
+  summaryStats Json      @default("{}")
+
+  child        Child         @relation(fields: [childId], references: [id], onDelete: Cascade)
+  attempts     Attempt[]
+  chatMessages ChatMessage[]
+
+  @@index([childId, startedAt(sort: Desc)])
+  @@map("sessions")
+}
+
+model Attempt {
+  id        String      @id @default(uuid()) @db.Uuid
+  sessionId String      @db.Uuid
+  wordId    String?
+  kind      AttemptKind
+  expected  String
+  heard     String
+  correct   Boolean
+  latencyMs Int?
+  createdAt DateTime    @default(now())
+
+  session Session      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  word    ContentWord? @relation(fields: [wordId], references: [id], onDelete: SetNull)
+
+  @@index([sessionId])
+  @@index([wordId])
+  @@map("attempts")
+}
+
+enum AttemptKind {
+  LETTER
+  WORD
+
+  @@map("attempt_kind")
+}
+
+model UnlockedAnimal {
+  childId    String   @db.Uuid
+  animalId   String
+  unlockedAt DateTime @default(now())
+  visits     Int      @default(1)
+
+  child  Child         @relation(fields: [childId], references: [id], onDelete: Cascade)
+  animal ContentAnimal @relation(fields: [animalId], references: [id], onDelete: Cascade)
+
+  @@id([childId, animalId])
+  @@index([childId, unlockedAt(sort: Desc)])
+  @@map("unlocked_animals")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Чат с животным (M8)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum ChatRole {
+  USER
+  ASSISTANT
+  SYSTEM
+
+  @@map("chat_role")
+}
+
+model ChatMessage {
+  id              String   @id @default(uuid()) @db.Uuid
+  sessionId       String   @db.Uuid
+  animalId        String
+  role            ChatRole
+  content         String
+  moderationFlags Json     @default("[]")
+  createdAt       DateTime @default(now())
+
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@map("chat_messages")
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Техлог (для ревью RuStore / отладки инцидентов)
+// ─────────────────────────────────────────────────────────────────────────────
+
+model TechLog {
+  id        BigInt   @id @default(autoincrement())
+  level     String
+  context   String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([createdAt(sort: Desc)])
+  @@index([context, createdAt(sort: Desc)])
+  @@map("tech_logs")
+}

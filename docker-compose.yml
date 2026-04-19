@@ -1,0 +1,143 @@
+# docker-compose.yml — основной compose-файл для локальной разработки и Dokploy
+#
+# Локально:
+#   docker-compose up -d postgres redis      # только инфра; server/web запускаются вручную
+#   docker-compose --profile app up -d        # вся связка
+#
+# Dokploy:
+#   Dokploy подключает этот файл целиком. Роутинг/SSL — через Dokploy UI (Traefik labels
+#   можно добавить через Dokploy, либо раскомментировать секции labels ниже).
+#
+# Порты наружу намеренно смещены, чтобы не конфликтовать с другими локальными сервисами
+# (postgres admin-house уже сидит на 5432).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ninegames-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-90games}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - ninegames-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-90games}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - ninegames
+
+  redis:
+    image: redis:7-alpine
+    container_name: ninegames-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - "256mb"
+      - --maxmemory-policy
+      - allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
+    volumes:
+      - ninegames-redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - ninegames
+
+  server:
+    build:
+      context: server
+      dockerfile: Dockerfile
+    image: ninegames-server:${IMAGE_TAG:-latest}
+    container_name: ninegames-server
+    restart: unless-stopped
+    profiles: ["app"]
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-90games}?schema=public
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_TTL_SECONDS: ${JWT_TTL_SECONDS:-2592000}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-anthropic/claude-haiku-4-5}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      RATE_LIMIT_CHAT_PER_MIN: ${RATE_LIMIT_CHAT_PER_MIN:-30}
+      RATE_LIMIT_CHAT_IP_PER_MIN: ${RATE_LIMIT_CHAT_IP_PER_MIN:-120}
+      DEVICE_ID_SALT: ${DEVICE_ID_SALT}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${SERVER_PORT:-3000}:3000"
+    healthcheck:
+      # Используем node вместо wget: wget в alpine-runtime может отсутствовать/урезан
+      test:
+        - CMD
+        - node
+        - -e
+        - "require('http').get('http://127.0.0.1:3000/health',r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>{try{process.exit(JSON.parse(d).status==='ok'?0:1)}catch{process.exit(1)}})}).on('error',()=>process.exit(1))"
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - ninegames
+    # Dokploy: Traefik автоматически настраивается через UI.
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.ninegames-api.rule=Host(`api.example.com`)
+    #   - traefik.http.services.ninegames-api.loadbalancer.server.port=3000
+
+  web:
+    build:
+      context: mobile
+      dockerfile: Dockerfile.web
+      args:
+        EXPO_PUBLIC_API_BASE_URL: ${EXPO_PUBLIC_API_BASE_URL:-http://localhost:3000}
+    image: ninegames-web:${IMAGE_TAG:-latest}
+    container_name: ninegames-web
+    restart: unless-stopped
+    profiles: ["app"]
+    depends_on:
+      server:
+        condition: service_healthy
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    healthcheck:
+      # wget в nginx:alpine присутствует — этот healthcheck безопасен
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -q ok || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ninegames
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.ninegames-web.rule=Host(`app.example.com`)
+    #   - traefik.http.services.ninegames-web.loadbalancer.server.port=80
+
+volumes:
+  ninegames-postgres-data:
+  ninegames-redis-data:
+
+networks:
+  ninegames:
+    driver: bridge
