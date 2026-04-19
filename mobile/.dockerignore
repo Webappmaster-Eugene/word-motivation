@@ -1,0 +1,14 @@
+node_modules
+.expo
+dist
+dist-web
+ios
+android
+coverage
+.git
+.github
+*.log
+.env
+.env.local
+.vscode
+.idea

@@ -1,0 +1,39 @@
+# Multi-stage сборка web-версии Expo-приложения для Dokploy
+#
+# Этап 1: builder — ставит зависимости, делает expo export → dist-web/
+# Этап 2: runtime — Nginx отдаёт статику с SPA-fallback
+
+# ───── builder ─────
+FROM node:22-alpine AS builder
+WORKDIR /app
+
+# API_BASE_URL пробрасывается через build arg; попадает в бандл во время `expo export`
+ARG EXPO_PUBLIC_API_BASE_URL=http://localhost:3000
+ENV EXPO_PUBLIC_API_BASE_URL=${EXPO_PUBLIC_API_BASE_URL}
+
+# Оптимизация кэша слоёв — сначала манифесты
+COPY package.json package-lock.json* ./
+RUN npm ci --no-audit --no-fund
+
+# Затем исходники
+COPY . .
+
+# Экспорт web-сборки (Expo SDK 52+, output: 'single' → SPA в dist-web/)
+RUN npx expo export --platform web --output-dir dist-web
+
+# ───── runtime ─────
+FROM nginx:1.27-alpine AS runtime
+
+# SPA-конфиг
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Статика
+COPY --from=builder /app/dist-web /usr/share/nginx/html
+
+# Удаляем дефолтный index на всякий случай (наш index.html от Expo его заменит)
+RUN rm -f /usr/share/nginx/html/index.nginx-debian.html
+
+EXPOSE 80
+
+# Nginx-процесс на PID 1; `daemon off` обязателен для Docker
+CMD ["nginx", "-g", "daemon off;"]
