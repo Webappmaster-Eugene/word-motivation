@@ -20,6 +20,12 @@ export const envSchema = z.object({
 
   DEVICE_ID_SALT: z.string().min(8, 'DEVICE_ID_SALT должен быть не короче 8 символов'),
 
+  /**
+   * Список разрешённых Origin-ов через запятую (например, "https://app.example.com,https://localhost:8080").
+   * Пустая строка = разрешить любой (только для dev!). В проде обязательно заполнять.
+   */
+  ALLOWED_ORIGINS: z.string().default(''),
+
   LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
 });
 

@@ -4,7 +4,12 @@ import { WORD_PACK } from '../content/words';
 import { isSpecialLetter } from '../content/special-letters';
 
 import { currentLetter, currentWord, isLetterMatch, isWordMatch } from './guards';
-import { MAX_RETRIES, type AlphabetContext, type AlphabetEvent } from './types';
+import {
+  MAX_RETRIES,
+  starsForWord,
+  type AlphabetContext,
+  type AlphabetEvent,
+} from './types';
 
 const initialContext: AlphabetContext = {
   words: WORD_PACK,
@@ -14,6 +19,9 @@ const initialContext: AlphabetContext = {
   wordRetries: 0,
   mode: 'normal',
   stats: { correct: 0, wrong: 0, autoAdvanced: 0 },
+  currentWordStats: { wrong: 0, autoAdvanced: false },
+  lastWordStars: 0,
+  totalStars: 0,
 };
 
 export const alphabetMachine = setup({
@@ -51,6 +59,7 @@ export const alphabetMachine = setup({
         letterRetries: 0,
         wordRetries: 0,
         mode: isSpecialLetter(letter) ? ('letter_inside_word' as const) : ('normal' as const),
+        currentWordStats: { wrong: 0, autoAdvanced: false },
       };
     }),
     advanceLetter: assign(({ context }) => {
@@ -75,10 +84,18 @@ export const alphabetMachine = setup({
     incrementLetterRetry: assign({
       letterRetries: ({ context }) => context.letterRetries + 1,
       stats: ({ context }) => ({ ...context.stats, wrong: context.stats.wrong + 1 }),
+      currentWordStats: ({ context }) => ({
+        ...context.currentWordStats,
+        wrong: context.currentWordStats.wrong + 1,
+      }),
     }),
     incrementWordRetry: assign({
       wordRetries: ({ context }) => context.wordRetries + 1,
       stats: ({ context }) => ({ ...context.stats, wrong: context.stats.wrong + 1 }),
+      currentWordStats: ({ context }) => ({
+        ...context.currentWordStats,
+        wrong: context.currentWordStats.wrong + 1,
+      }),
     }),
     markLetterCorrect: assign({
       stats: ({ context }) => ({ ...context.stats, correct: context.stats.correct + 1 }),
@@ -88,6 +105,14 @@ export const alphabetMachine = setup({
     }),
     markAutoAdvanced: assign({
       stats: ({ context }) => ({ ...context.stats, autoAdvanced: context.stats.autoAdvanced + 1 }),
+      currentWordStats: ({ context }) => ({ ...context.currentWordStats, autoAdvanced: true }),
+    }),
+    awardStars: assign(({ context }) => {
+      const earned = starsForWord(context.currentWordStats);
+      return {
+        lastWordStars: earned,
+        totalStars: context.totalStars + earned,
+      };
     }),
   },
 }).createMachine({
@@ -195,6 +220,7 @@ export const alphabetMachine = setup({
     },
 
     revealAnimal: {
+      entry: 'awardStars',
       on: {
         SCENE_READY: { target: 'sceneReady' },
       },

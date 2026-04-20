@@ -13,9 +13,11 @@ import { HintBanner } from './components/hint-banner';
 import { LetterCard } from './components/letter-card';
 import { MicButton } from './components/mic-button';
 import { ProgressPips } from './components/progress-pips';
+import { StarsBanner } from './components/stars-banner';
 import { WordReveal } from './components/word-reveal';
 import { MAX_RETRIES } from './fsm/types';
 import { useAlphabetMachine } from './hooks/use-alphabet-machine';
+import { useLetterMastery } from './hooks/use-letter-mastery';
 import { useProgressSync } from './hooks/use-progress-sync';
 import { useVoiceInput } from './hooks/use-voice-input';
 
@@ -45,8 +47,15 @@ interface AlphabetGameProps {
 
 export function AlphabetGame({ content }: AlphabetGameProps) {
   const router = useRouter();
+  const mastery = useLetterMastery(content.words);
+
+  // Подсовываем FSM упорядоченный по mastery список, чтобы первыми шли слова
+  // со сложными буквами. Пока не загрузили snapshot — используем обычный порядок.
+  const orderedContent = useRef(content);
+  orderedContent.current = mastery.loaded ? { ...content, words: mastery.ordered } : content;
+
   const { state, send, word, letter, animal, mode, letterIndex, letterRetries, wordRetries } =
-    useAlphabetMachine({ content });
+    useAlphabetMachine({ content: orderedContent.current });
 
   const lastStats = useRef({ correct: 0, wrong: 0 });
 
@@ -68,12 +77,19 @@ export function AlphabetGame({ content }: AlphabetGameProps) {
 
   useEffect(() => {
     const { correct, wrong } = state.context.stats;
-    if (correct > lastStats.current.correct) {
+    const correctDelta = correct - lastStats.current.correct;
+    const wrongDelta = wrong - lastStats.current.wrong;
+
+    if (correctDelta > 0) {
       tryHaptic('success');
-    } else if (wrong > lastStats.current.wrong) {
+      if (letter) mastery.recordLetter(letter, true);
+    } else if (wrongDelta > 0) {
       tryHaptic(Haptics.ImpactFeedbackStyle.Soft);
+      if (letter) mastery.recordLetter(letter, false);
     }
     lastStats.current = { correct, wrong };
+    // mastery.recordLetter — стабильный идентификатор функции, letter и stats обновляются
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.context.stats]);
 
   const goHome = () => router.back();
@@ -279,7 +295,12 @@ export function AlphabetGame({ content }: AlphabetGameProps) {
     }
 
     if ((state.matches('revealAnimal') || state.matches('sceneReady')) && animal) {
-      return <AnimalRevealCard animal={animal} onContinue={exitConversation} />;
+      return (
+        <View style={styles.revealWrap}>
+          <StarsBanner count={state.context.lastWordStars} total={state.context.totalStars} />
+          <AnimalRevealCard animal={animal} onContinue={exitConversation} />
+        </View>
+      );
     }
 
     if (state.matches('done')) {
@@ -357,5 +378,10 @@ const styles = StyleSheet.create({
     fontSize: 36,
     fontWeight: '800',
     color: theme.colors.success,
+  },
+  revealWrap: {
+    flex: 1,
+    gap: theme.spacing.md,
+    paddingTop: theme.spacing.md,
   },
 });

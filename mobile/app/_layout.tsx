@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ServicesProvider } from '@/services/di/provider';
+import { ConsentGate } from '@/shared/screens/consent-gate';
 
 export default function RootLayout() {
   const queryClient = useMemo(
@@ -28,13 +29,15 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <ServicesProvider>
             <StatusBar style="dark" />
-            <Stack
-              screenOptions={{
-                headerShown: false,
-                animation: 'fade',
-                contentStyle: { backgroundColor: '#FFF4E0' },
-              }}
-            />
+            <ConsentGate>
+              <Stack
+                screenOptions={{
+                  headerShown: false,
+                  animation: 'fade',
+                  contentStyle: { backgroundColor: '#FFF4E0' },
+                }}
+              />
+            </ConsentGate>
           </ServicesProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

@@ -1,4 +1,5 @@
 import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 
 import { ZodValidationPipe } from '../../common/pipes/zod-validation.pipe';
 import {
@@ -11,8 +12,13 @@ import { ChatService } from './chat.service';
 import { chatReplySchema, type ChatReplyDto } from './dto/chat-reply.schema';
 import { ChatReplyPresenter } from './presenter/chat-reply.presenter';
 
+/**
+ * Rate-limit — по IP через `ThrottlerGuard` (конфиг в `AppModule.ThrottlerModule`).
+ * Значение берётся из env `RATE_LIMIT_CHAT_IP_PER_MIN` (default 120/min).
+ * Per-childId лимит планируется в M11.3 через кастомный `ThrottlerGuard.getTracker`.
+ */
 @Controller('chat')
-@UseGuards(JwtAuthGuard)
+@UseGuards(ThrottlerGuard, JwtAuthGuard)
 export class ChatController {
   constructor(private readonly chat: ChatService) {}
 

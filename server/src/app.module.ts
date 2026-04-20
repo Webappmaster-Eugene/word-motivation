@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
 import { envSchema, type AppConfig } from './config/env.schema';
@@ -38,6 +39,19 @@ import { ProgressModule } from './modules/progress/progress.module';
         level: process.env.LOG_LEVEL ?? 'info',
         redact: ['req.headers.authorization', 'req.headers.cookie'],
       },
+    }),
+    ThrottlerModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: (config: ConfigService<AppConfig>) => ({
+        throttlers: [
+          {
+            name: 'chat-ip',
+            ttl: 60_000,
+            limit: config.getOrThrow('RATE_LIMIT_CHAT_IP_PER_MIN', { infer: true }),
+          },
+        ],
+      }),
     }),
     PrismaModule,
     AuthModule,

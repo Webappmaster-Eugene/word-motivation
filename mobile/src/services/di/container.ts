@@ -8,6 +8,7 @@ import { BackendContentRepo } from '@/services/content-repo/backend-content-repo
 import { LocalContentRepo } from '@/services/content-repo/local-content-repo';
 import { ResilientContentRepo } from '@/services/content-repo/resilient-content-repo';
 import { LlmChatClient } from '@/services/llm-chat/llm-chat';
+import { LetterMasteryRepo } from '@/services/mastery/letter-mastery';
 import { ProgressApi } from '@/services/progress-api/progress-api';
 import { StubAsr } from '@/services/speech-recognition/stub-asr';
 import type { SpeechRecognitionService } from '@/services/speech-recognition/types';
@@ -35,6 +36,7 @@ export function createServiceBundle(): ServiceBundle {
 
   const progressApi = new ProgressApi(apiClient, deviceAuth);
   const llmChat = new LlmChatClient(apiClient, deviceAuth);
+  const letterMastery = new LetterMasteryRepo();
 
   return {
     speechRecognition: pickSpeechRecognition(),
@@ -45,5 +47,6 @@ export function createServiceBundle(): ServiceBundle {
     contentRepo,
     progressApi,
     llmChat,
+    letterMastery,
   };
 }

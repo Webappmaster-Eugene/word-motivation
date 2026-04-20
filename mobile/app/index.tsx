@@ -3,6 +3,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { gameRegistry } from '@/games/registry';
+import { DailyQuestCard } from '@/shared/ui/daily-quest-card';
 import { theme } from '@/shared/theme';
 
 /**
@@ -19,6 +20,9 @@ export default function HubScreen() {
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.daily}>
+          <DailyQuestCard />
+        </View>
         <View style={styles.row}>
           {games.map((item) => (
             <Link
@@ -92,6 +96,9 @@ const styles = StyleSheet.create({
   scroll: {
     paddingHorizontal: theme.spacing.lg,
     paddingBottom: theme.spacing.xxl,
+  },
+  daily: {
+    marginBottom: theme.spacing.lg,
   },
   row: {
     flexDirection: 'row',

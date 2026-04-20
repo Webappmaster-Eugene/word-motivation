@@ -241,4 +241,77 @@ describe('alphabetMachine', () => {
     actor.send({ type: 'SUBMIT_LETTER', value: 'о' });
     expect(state(actor)).toBe('hintLetter');
   });
+
+  describe('звёзды', () => {
+    it('3 звезды за безупречное слово', () => {
+      const actor = spawn();
+      playThroughWord(actor, WORD_PACK[0]!);
+      expect(ctx(actor).lastWordStars).toBe(3);
+      expect(ctx(actor).totalStars).toBe(3);
+    });
+
+    it('2 звезды за одну ошибку', () => {
+      const actor = spawn();
+      actor.send({ type: 'START' });
+      actor.send({ type: 'LETTER_SHOWN' });
+      actor.send({ type: 'SUBMIT_LETTER', value: 'я' }); // wrong 1
+      actor.send({ type: 'HINT_DONE' });
+      for (const letter of ['с', 'о', 'б', 'а', 'к', 'а']) {
+        actor.send({ type: 'LETTER_SHOWN' });
+        actor.send({ type: 'SUBMIT_LETTER', value: letter });
+      }
+      actor.send({ type: 'LETTER_SHOWN' });
+      actor.send({ type: 'SUBMIT_WORD', value: 'собака' });
+      expect(ctx(actor).lastWordStars).toBe(2);
+    });
+
+    it('1 звезда при fail-soft (auto-advance)', () => {
+      const actor = spawn();
+      actor.send({ type: 'START' });
+      actor.send({ type: 'LETTER_SHOWN' });
+      actor.send({ type: 'SUBMIT_LETTER', value: 'я' });
+      actor.send({ type: 'HINT_DONE' });
+      actor.send({ type: 'SUBMIT_LETTER', value: 'я' });
+      actor.send({ type: 'HINT_DONE' });
+      actor.send({ type: 'SUBMIT_LETTER', value: 'я' }); // auto-advance
+      for (const letter of ['о', 'б', 'а', 'к', 'а']) {
+        actor.send({ type: 'LETTER_SHOWN' });
+        actor.send({ type: 'SUBMIT_LETTER', value: letter });
+      }
+      actor.send({ type: 'LETTER_SHOWN' });
+      actor.send({ type: 'SUBMIT_WORD', value: 'собака' });
+      expect(ctx(actor).lastWordStars).toBe(1);
+    });
+
+    it('totalStars накапливается между словами', () => {
+      const actor = spawn();
+      playThroughWord(actor, WORD_PACK[0]!);
+      actor.send({ type: 'SCENE_READY' });
+      actor.send({ type: 'EXIT_CONVERSATION' });
+      actor.send({ type: 'START' });
+
+      // Второе слово — с одной ошибкой
+      const second = WORD_PACK[1]!;
+      actor.send({ type: 'LETTER_SHOWN' });
+      actor.send({ type: 'SUBMIT_LETTER', value: 'я' });
+      actor.send({ type: 'HINT_DONE' });
+      for (const letter of second.letters) {
+        actor.send({ type: 'LETTER_SHOWN' });
+        actor.send({ type: 'SUBMIT_LETTER', value: letter });
+      }
+      actor.send({ type: 'LETTER_SHOWN' });
+      actor.send({ type: 'SUBMIT_WORD', value: second.word });
+
+      expect(ctx(actor).totalStars).toBe(3 + 2);
+    });
+
+    it('currentWordStats сбрасывается при переходе к следующему слову', () => {
+      const actor = spawn();
+      playThroughWord(actor, WORD_PACK[0]!);
+      actor.send({ type: 'SCENE_READY' });
+      actor.send({ type: 'EXIT_CONVERSATION' });
+      actor.send({ type: 'START' });
+      expect(ctx(actor).currentWordStats).toEqual({ wrong: 0, autoAdvanced: false });
+    });
+  });
 });
