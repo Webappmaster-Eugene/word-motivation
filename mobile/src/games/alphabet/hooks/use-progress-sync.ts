@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useService } from '@/services/di/provider';
 
@@ -29,6 +29,11 @@ interface UseProgressSyncOptions {
  * (backend-side данные будут неполными, что ок для MVP). В M9+ добавим
  * retry-queue на SQLite.
  */
+export interface ProgressSyncState {
+  /** sessionId появляется после успешного POST /progress/session; до этого null. */
+  readonly sessionId: string | null;
+}
+
 export function useProgressSync({
   stateValue,
   gameId,
@@ -37,10 +42,11 @@ export function useProgressSync({
   statsCorrect,
   statsWrong,
   animalId,
-}: UseProgressSyncOptions): void {
+}: UseProgressSyncOptions): ProgressSyncState {
   const progress = useService('progressApi');
   const localUnlocked = useService('localUnlocked');
 
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const lastCorrectRef = useRef(0);
   const lastWrongRef = useRef(0);
@@ -56,7 +62,9 @@ export function useProgressSync({
     progress
       .startSession({ gameId })
       .then((session) => {
-        if (!cancelled) sessionIdRef.current = session.id;
+        if (cancelled) return;
+        sessionIdRef.current = session.id;
+        setSessionId(session.id);
       })
       .catch((err) => {
         if (__DEV__) {
@@ -134,14 +142,14 @@ export function useProgressSync({
 
   // End-of-session: при unmount или done-состоянии завершаем сессию.
   useEffect(() => {
-    const sessionId = sessionIdRef.current;
-    if (!sessionId) return;
+    const activeSessionId = sessionIdRef.current;
+    if (!activeSessionId) return;
     if (stateValue !== 'done' || sessionEndedRef.current) return;
     sessionEndedRef.current = true;
 
     progress
       .endSession({
-        sessionId,
+        sessionId: activeSessionId,
         summaryStats: {
           correct: statsCorrect,
           wrong: statsWrong,
@@ -151,4 +159,6 @@ export function useProgressSync({
         /* graceful-skip */
       });
   }, [stateValue, statsCorrect, statsWrong, progress]);
+
+  return { sessionId };
 }

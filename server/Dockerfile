@@ -22,4 +22,11 @@ COPY package*.json ./
 USER app
 EXPOSE 3000
 # NestJS из-за `prisma/` в tsconfig.include укладывает бандл в dist/src/.
-CMD ["node", "dist/src/main.js"]
+#
+# При старте контейнера:
+#   1. `prisma migrate deploy` — накатывает применимые миграции из prisma/migrations/.
+#      Идемпотентно: если БД уже актуальна, команда просто выходит 0.
+#   2. `prisma db seed` — сид контента (animals + words). Идемпотентный (upsert).
+#   3. `node dist/src/main.js` — запуск Nest/Fastify.
+# Если п.1 или п.2 упадут — контейнер упадёт, Dokploy покажет ошибку в логах.
+CMD ["sh", "-c", "npx prisma migrate deploy && npx prisma db seed && node dist/src/main.js"]

@@ -1,15 +1,26 @@
-# docker-compose.yml — основной compose-файл для локальной разработки и Dokploy
+# docker-compose.yml — основной compose-файл (production / Dokploy)
 #
 # Локально:
-#   docker-compose up -d postgres redis      # только инфра; server/web запускаются вручную
+#   docker-compose up -d postgres redis       # только инфра; server/web запускаются вручную
 #   docker-compose --profile app up -d        # вся связка
+#   # docker-compose.override.yml при локальном запуске добавит host-порты
+#   # 5433 (postgres) и 6380 (redis) для прямого доступа с хоста (Prisma Studio и т.п.).
 #
 # Dokploy:
-#   Dokploy подключает этот файл целиком. Роутинг/SSL — через Dokploy UI (Traefik labels
-#   можно добавить через Dokploy, либо раскомментировать секции labels ниже).
+#   Dokploy вызывает `docker compose -f ./docker-compose.yml up -d --build`.
+#   Флаг -f явный, поэтому docker-compose.override.yml НЕ мержится — prod не получает
+#   host-портов для БД/Redis (они общаются по внутренней сети compose).
 #
-# Порты наружу намеренно смещены, чтобы не конфликтовать с другими локальными сервисами
-# (postgres admin-house уже сидит на 5432).
+#   В Dokploy UI → Environment Variables нужно выставить минимум:
+#     COMPOSE_PROFILES=app         # иначе server/web (под profiles:[app]) не поднимутся
+#     JWT_SECRET=<64 байта random>
+#     DEVICE_ID_SALT=<random>
+#     EXPO_PUBLIC_API_BASE_URL=https://<api-домен>
+#     ALLOWED_ORIGINS=https://<web-домен>
+#     OPENROUTER_API_KEY=<ключ>    # после M8
+#
+#   Роутинг/SSL — через Dokploy UI (Traefik labels можно добавить через Dokploy,
+#   либо раскомментировать секции labels ниже).
 
 services:
   postgres:
@@ -21,8 +32,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-90games}
       PGDATA: /var/lib/postgresql/data/pgdata
-    ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+    # Host-порт пробрасывает только docker-compose.override.yml (локальный dev).
+    # В prod доступ только по внутренней сети: postgres:5432 из server-контейнера.
     volumes:
       - ninegames-postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -45,8 +56,8 @@ services:
       - "256mb"
       - --maxmemory-policy
       - allkeys-lru
-    ports:
-      - "${REDIS_PORT:-6380}:6379"
+    # Host-порт пробрасывает только docker-compose.override.yml (локальный dev).
+    # В prod доступ только по внутренней сети: redis:6379 из server-контейнера.
     volumes:
       - ninegames-redis-data:/data
     healthcheck:

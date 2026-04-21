@@ -13,16 +13,27 @@ import type { AnimalSceneAsset } from '@/services/animal-scene/types';
 import { theme } from '@/shared/theme';
 
 import type { AnimalInfo } from '../content/types';
+
+import { AnimalChat } from './animal-chat';
 import { AnimalScene } from './animal-scene';
 
 interface AnimalRevealCardProps {
   readonly animal: AnimalInfo;
   readonly onContinue: () => void;
+  /** Когда true — вместо greeting-bubble показываем чат с животным (M8). */
+  readonly chatEnabled?: boolean;
+  /** sessionId из ProgressSync; нужен для авторизованного вызова /chat. */
+  readonly sessionId?: string | null;
 }
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
-export function AnimalRevealCard({ animal, onContinue }: AnimalRevealCardProps) {
+export function AnimalRevealCard({
+  animal,
+  onContinue,
+  chatEnabled = false,
+  sessionId = null,
+}: AnimalRevealCardProps) {
   const sceneService = useService('animalScene');
   const [sceneReady, setSceneReady] = useState(false);
 
@@ -55,6 +66,35 @@ export function AnimalRevealCard({ animal, onContinue }: AnimalRevealCardProps) 
     opacity: bubbleOpacity.value,
     transform: [{ translateY: (1 - bubbleOpacity.value) * 16 }],
   }));
+
+  if (chatEnabled) {
+    return (
+      <View style={styles.chatContainer}>
+        <View style={styles.sceneCompact}>
+          {sceneReady ? (
+            <AnimalScene asset={asset} animation="greet" />
+          ) : (
+            <View style={styles.loaderCompact}>
+              <Text style={styles.loaderText}>Готовим сцену…</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.chatArea}>
+          <AnimalChat sessionId={sessionId} animal={animal} />
+        </View>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Идём к следующему слову"
+          onPress={onContinue}
+          style={({ pressed }) => [styles.ctaCompact, pressed && styles.ctaPressed]}
+        >
+          <Text style={styles.ctaTextCompact}>Идём дальше →</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -135,5 +175,38 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 18,
+  },
+  chatContainer: {
+    flex: 1,
+    gap: theme.spacing.sm,
+  },
+  sceneCompact: {
+    height: 200,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loaderCompact: {
+    width: 160,
+    height: 160,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: theme.radii.lg,
+    backgroundColor: theme.colors.surface,
+  },
+  chatArea: {
+    flex: 1,
+  },
+  ctaCompact: {
+    alignSelf: 'center',
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    marginBottom: theme.spacing.sm,
+    borderRadius: theme.radii.full,
+    backgroundColor: theme.colors.accent,
+  },
+  ctaTextCompact: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 16,
   },
 });

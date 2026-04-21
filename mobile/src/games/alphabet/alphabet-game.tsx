@@ -189,7 +189,7 @@ export function AlphabetGame({
     }
   }, [voiceActive, voice.available, tts]);
 
-  useProgressSync({
+  const { sessionId } = useProgressSync({
     stateValue: String(state.value),
     gameId: 'alphabet',
     word,
@@ -377,10 +377,19 @@ export function AlphabetGame({
     }
 
     if ((state.matches('revealAnimal') || state.matches('sceneReady')) && animal) {
+      // Чат появляется только в sceneReady — после того, как TTS закончил
+      // проговаривать приветствие. Иначе одновременно звучал бы greeting
+      // и «в истории» уже был бы тот же текст как первое сообщение.
+      const chatEnabled = state.matches('sceneReady');
       return (
         <View style={styles.revealWrap}>
           <StarsBanner count={state.context.lastWordStars} total={state.context.totalStars} />
-          <AnimalRevealCard animal={animal} onContinue={exitConversation} />
+          <AnimalRevealCard
+            animal={animal}
+            onContinue={exitConversation}
+            chatEnabled={chatEnabled}
+            sessionId={sessionId}
+          />
         </View>
       );
     }

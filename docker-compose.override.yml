@@ -1,0 +1,19 @@
+# docker-compose.override.yml — локальные доработки для разработки.
+#
+# Docker Compose автоматически мержит этот файл при вызове без явного -f
+# (`docker-compose up -d ...`). Dokploy вызывает `-f ./docker-compose.yml` явно,
+# поэтому этот файл на prod НЕ применяется — порты БД/Redis туда не проникают.
+#
+# Назначение:
+#   - Пробросить host-порты postgres (5433) и redis (6380) на локальную машину,
+#     чтобы Prisma Studio, psql, redis-cli и MCP postgres работали напрямую.
+#   - Дефолты из .env / переменных окружения оставлены через подстановку ${...}.
+
+services:
+  postgres:
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+
+  redis:
+    ports:
+      - "${REDIS_PORT:-6380}:6379"
