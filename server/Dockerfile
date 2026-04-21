@@ -19,6 +19,10 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/prisma ./prisma
 COPY package*.json ./
+# tsconfig.json нужен ts-node для `prisma db seed` — без него Node.js
+# падает в ESM-loader по дефолту, и импорты вроде `./seed/animals`
+# (без расширения) не резолвятся (ERR_MODULE_NOT_FOUND).
+COPY tsconfig.json ./
 USER app
 EXPOSE 3000
 # NestJS из-за `prisma/` в tsconfig.include укладывает бандл в dist/src/.
