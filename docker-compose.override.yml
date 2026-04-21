@@ -5,8 +5,9 @@
 # поэтому этот файл на prod НЕ применяется — порты БД/Redis туда не проникают.
 #
 # Назначение:
-#   - Пробросить host-порты postgres (5433) и redis (6380) на локальную машину,
-#     чтобы Prisma Studio, psql, redis-cli и MCP postgres работали напрямую.
+#   - Пробросить host-порты postgres (5433), redis (6380), server (3000), web (8080)
+#     на локальную машину, чтобы Prisma Studio, psql, redis-cli, MCP postgres, а также
+#     локальные браузер/curl работали напрямую.
 #   - Дефолты из .env / переменных окружения оставлены через подстановку ${...}.
 
 services:
@@ -17,3 +18,11 @@ services:
   redis:
     ports:
       - "${REDIS_PORT:-6380}:6379"
+
+  server:
+    ports:
+      - "${SERVER_PORT:-3000}:3000"
+
+  web:
+    ports:
+      - "${WEB_PORT:-8080}:80"

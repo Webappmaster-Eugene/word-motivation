@@ -97,8 +97,11 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    ports:
-      - "${SERVER_PORT:-3000}:3000"
+    # Host-порт пробрасывает только docker-compose.override.yml (локальный dev).
+    # В prod доступ — через Dokploy Traefik (Domains в UI приложения),
+    # Traefik ходит внутри compose-сети по имени `server:3000`.
+    expose:
+      - "3000"
     healthcheck:
       # Используем node вместо wget: wget в alpine-runtime может отсутствовать/урезан
       test:
@@ -131,8 +134,10 @@ services:
     depends_on:
       server:
         condition: service_healthy
-    ports:
-      - "${WEB_PORT:-8080}:80"
+    # Host-порт пробрасывает только docker-compose.override.yml (локальный dev).
+    # В prod доступ — через Dokploy Traefik (Domains в UI приложения).
+    expose:
+      - "80"
     healthcheck:
       # wget в nginx:alpine присутствует — этот healthcheck безопасен
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/healthz | grep -q ok || exit 1"]
