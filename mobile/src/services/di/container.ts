@@ -9,6 +9,7 @@ import { LocalContentRepo } from '@/services/content-repo/local-content-repo';
 import { ResilientContentRepo } from '@/services/content-repo/resilient-content-repo';
 import { LlmChatClient } from '@/services/llm-chat/llm-chat';
 import { LetterMasteryRepo } from '@/services/mastery/letter-mastery';
+import { LocalUnlockedRepo } from '@/services/mastery/local-unlocked';
 import { ProgressApi } from '@/services/progress-api/progress-api';
 import { StubAsr } from '@/services/speech-recognition/stub-asr';
 import type { SpeechRecognitionService } from '@/services/speech-recognition/types';
@@ -18,8 +19,24 @@ import { ExpoSpeechTts } from '@/services/speech-synthesis/expo-speech-tts';
 import type { ServiceBundle } from './types';
 
 function pickSpeechRecognition(): SpeechRecognitionService {
-  if (Platform.OS === 'web' && WebSpeechAsr.isSupported()) return new WebSpeechAsr();
-  return new StubAsr();
+  if (Platform.OS === 'web') {
+    return WebSpeechAsr.isSupported() ? new WebSpeechAsr() : new StubAsr();
+  }
+  // Native (Android/iOS): expo-speech-recognition. Лениво импортируем,
+  // чтобы при web-сборке не тянуть native-модуль.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { ExpoSpeechRecognitionAsr } = require('@/services/speech-recognition/expo-speech-recognition-asr') as {
+      ExpoSpeechRecognitionAsr: new () => SpeechRecognitionService;
+    };
+    return new ExpoSpeechRecognitionAsr();
+  } catch (err) {
+    if (__DEV__) {
+      // eslint-disable-next-line no-console
+      console.warn('expo-speech-recognition не установлен, падаем на stub:', err);
+    }
+    return new StubAsr();
+  }
 }
 
 export function createServiceBundle(): ServiceBundle {
@@ -37,6 +54,7 @@ export function createServiceBundle(): ServiceBundle {
   const progressApi = new ProgressApi(apiClient, deviceAuth);
   const llmChat = new LlmChatClient(apiClient, deviceAuth);
   const letterMastery = new LetterMasteryRepo();
+  const localUnlocked = new LocalUnlockedRepo();
 
   return {
     speechRecognition: pickSpeechRecognition(),
@@ -48,5 +66,6 @@ export function createServiceBundle(): ServiceBundle {
     progressApi,
     llmChat,
     letterMastery,
+    localUnlocked,
   };
 }

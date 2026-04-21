@@ -21,13 +21,14 @@ function webConfirm(message: string): boolean {
 export default function SettingsScreen() {
   const router = useRouter();
   const mastery = useService('letterMastery');
+  const localUnlocked = useService('localUnlocked');
   const queryClient = useQueryClient();
   const [resetting, setResetting] = useState(false);
 
   const doReset = async () => {
     setResetting(true);
     try {
-      await mastery.reset();
+      await Promise.all([mastery.reset(), localUnlocked.reset()]);
       void queryClient.invalidateQueries();
       if (Platform.OS !== 'web') {
         Alert.alert('Готово', 'Прогресс сброшен.');
@@ -39,7 +40,7 @@ export default function SettingsScreen() {
 
   const confirmReset = () => {
     const message =
-      'Сбросить прогресс по буквам? Открытые животные в зоопарке останутся (они на сервере).';
+      'Сбросить прогресс: открытые животные в зоопарке исчезнут, статистика по буквам обнулится.';
     if (Platform.OS === 'web') {
       if (webConfirm(message)) void doReset();
       return;

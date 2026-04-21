@@ -62,6 +62,7 @@ export function useVoiceInput({ active, grammar, onFinal, onError }: UseVoiceInp
           break;
         case 'error':
           setMicState('idle');
+          setTranscript('');
           onErrorRef.current?.(event.message);
           break;
         case 'vad':
@@ -72,6 +73,9 @@ export function useVoiceInput({ active, grammar, onFinal, onError }: UseVoiceInp
     const unsubscribe = asr.subscribe(handle);
     return () => {
       unsubscribe();
+      // Гасим сессию ASR при unmount: иначе микрофон продолжает слушать
+      // и может прислать final-событие на размонтированный компонент.
+      void asr.stop();
     };
   }, [asr]);
 

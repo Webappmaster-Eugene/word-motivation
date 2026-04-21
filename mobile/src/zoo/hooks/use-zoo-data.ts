@@ -22,16 +22,28 @@ export interface ZooGroup {
 export function useZooData() {
   const repo = useService('contentRepo');
   const progress = useService('progressApi');
+  const localUnlocked = useService('localUnlocked');
 
   return useQuery({
     queryKey: ['zoo-data'],
     queryFn: async (): Promise<readonly ZooGroup[]> => {
-      const [content, unlockedResult] = await Promise.all([
+      const [content, unlockedResult, localSnap] = await Promise.all([
         repo.getAlphabetContent(),
         progress.listUnlocked().catch(() => [] as const),
+        localUnlocked.load(),
       ]);
 
+      // backend-источник истины, но локальный снап даёт offline-фидбэк
       const unlockedMap = new Map(unlockedResult.map((u) => [u.animalId, u]));
+      for (const [animalId, rec] of Object.entries(localSnap)) {
+        if (!unlockedMap.has(animalId)) {
+          unlockedMap.set(animalId, {
+            animalId,
+            unlockedAt: rec.unlockedAt,
+            visits: rec.visits,
+          });
+        }
+      }
 
       const zooAnimals: ZooAnimal[] = Object.values(content.animals).map((animal) => {
         const rec = unlockedMap.get(animal.id);

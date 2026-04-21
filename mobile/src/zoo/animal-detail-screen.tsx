@@ -1,22 +1,18 @@
+import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimalScene } from '@/games/alphabet/components/animal-scene';
 import { MicButton } from '@/games/alphabet/components/mic-button';
+import { TypingIndicator } from '@/games/alphabet/components/typing-indicator';
 import { useVoiceInput } from '@/games/alphabet/hooks/use-voice-input';
 import type { AnimalInfo } from '@/games/alphabet/content/types';
 import type { AnimalSceneAsset } from '@/services/animal-scene/types';
 import { useService } from '@/services/di/provider';
 import type { ChatHistoryEntry } from '@/services/llm-chat/llm-chat';
+import { sanitizeUserMessage } from '@/shared/client-moderation';
 import { theme } from '@/shared/theme';
 
 import { useZooData } from './hooks/use-zoo-data';
@@ -31,11 +27,50 @@ const QUICK_QUESTIONS: readonly string[] = [
   'Что ты умеешь?',
 ];
 
+type ChatMessage = ChatHistoryEntry & { readonly sanitized?: boolean };
+
+function triggerHaptic(type: 'light' | 'success' | 'warning' = 'light'): void {
+  if (Platform.OS === 'web') return;
+  try {
+    if (type === 'success') {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else if (type === 'warning') {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    } else {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  } catch {
+    // noop
+  }
+}
+
+/**
+ * Готовит историю для отправки на сервер: отбрасывает санитизированные
+ * user-сообщения и следующий за ними ассистентский ответ (это был scripted
+ * fallback на мат — не релевантен для LLM-контекста). Также приводит тип
+ * к `ChatHistoryEntry` без служебного поля `sanitized`.
+ */
+function buildCleanHistory(messages: readonly ChatMessage[]): ChatHistoryEntry[] {
+  const out: ChatHistoryEntry[] = [];
+  for (let i = 0; i < messages.length; i += 1) {
+    const m = messages[i]!;
+    if (m.sanitized) {
+      // Пропускаем этот user и следующий assistant (если он есть).
+      const next = messages[i + 1];
+      if (next && next.role === 'assistant') i += 1;
+      continue;
+    }
+    out.push({ role: m.role, content: m.content });
+  }
+  return out;
+}
+
 export function AnimalDetailScreen({ animalId }: Props) {
   const router = useRouter();
   const query = useZooData();
   const tts = useService('speechSynthesis');
   const progress = useService('progressApi');
+  const localUnlocked = useService('localUnlocked');
   const llm = useService('llmChat');
 
   const animal: AnimalInfo | null = useMemo(() => {
@@ -48,33 +83,46 @@ export function AnimalDetailScreen({ animalId }: Props) {
   }, [query.data, animalId]);
 
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [history, setHistory] = useState<readonly ChatHistoryEntry[]>([]);
+  const [history, setHistory] = useState<readonly ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
-  const historyRef = useRef<ChatHistoryEntry[]>([]);
+  const historyRef = useRef<ChatMessage[]>([]);
   historyRef.current = [...history];
   const scrollRef = useRef<ScrollView | null>(null);
+  // Зеркалим sessionId в ref, чтобы cleanup-коллбэк useEffect с устаревшей
+  // реактивной переменной всё равно видел актуальное значение и мог закрыть сессию.
+  const sessionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
-  // Сессия zoo — одна на вход на экран. Unlock счётчик визитов тоже бампается.
   useEffect(() => {
     if (!animal) return;
     let cancelled = false;
     progress
       .startSession({ gameId: 'zoo' })
       .then((s) => {
-        if (!cancelled) setSessionId(s.id);
+        if (!cancelled) {
+          setSessionId(s.id);
+          sessionIdRef.current = s.id;
+        }
       })
       .catch(() => {
         /* graceful */
       });
+    void localUnlocked.unlock(animal.id).catch(() => {
+      /* non-fatal */
+    });
     progress.unlockAnimal(animal.id).catch(() => {
       /* graceful */
     });
     return () => {
       cancelled = true;
-      if (sessionId) {
-        progress.endSession({ sessionId }).catch(() => {
+      const sid = sessionIdRef.current;
+      if (sid) {
+        progress.endSession({ sessionId: sid }).catch(() => {
           /* graceful */
         });
+        sessionIdRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,51 +136,71 @@ export function AnimalDetailScreen({ animalId }: Props) {
     [animal, tts],
   );
 
-  // При первом показе — greeting.
   useEffect(() => {
     if (!animal) return;
-    const initial: ChatHistoryEntry[] = [{ role: 'assistant', content: animal.greeting }];
+    const initial: ChatMessage[] = [{ role: 'assistant', content: animal.greeting }];
     setHistory(initial);
     speakReply(animal.greeting);
   }, [animal, speakReply]);
 
   const sendMessage = useCallback(
-    async (userText: string) => {
-      if (!animal || !userText.trim()) return;
-      const nextHistory = [...historyRef.current, { role: 'user' as const, content: userText }];
+    async (rawUserText: string) => {
+      if (!animal || !rawUserText.trim()) return;
+
+      // Клиентская санитизация ДО добавления в bubble — если мат, подменяем на заглушку.
+      const { safe, clean } = sanitizeUserMessage(rawUserText.trim());
+      const userMessage: ChatMessage = { role: 'user', content: safe, sanitized: !clean };
+
+      // Сохраняем snapshot истории ДО добавления нового сообщения — его шлём серверу.
+      // Дополнительно фильтруем: отбрасываем санитизированные user-сообщения и следующий
+      // за ними ассистентский ответ (сервер тогда отдал scripted fallback-реплику,
+      // не связанную с реальным диалогом). Так LLM не путается в контексте.
+      const cleanHistoryForServer = buildCleanHistory(historyRef.current);
+
+      const nextHistory = [...historyRef.current, userMessage];
       setHistory(nextHistory);
       setIsThinking(true);
+      triggerHaptic(clean ? 'light' : 'warning');
 
       const sid = sessionId;
       if (!sid) {
         setIsThinking(false);
-        setHistory([...nextHistory, { role: 'assistant', content: animal.greeting }]);
+        // Нет сессии — оффлайн fallback: повторяем greeting
+        setHistory([
+          ...nextHistory,
+          { role: 'assistant', content: animal.greeting },
+        ]);
         speakReply(animal.greeting);
         return;
       }
 
       try {
+        // Отправляем на сервер ОРИГИНАЛЬНЫЙ текст (server сам модерирует);
+        // у себя в UI показываем только санитизированный.
         const response = await llm.reply({
           sessionId: sid,
           animalId: animal.id,
-          userText,
-          history: nextHistory.slice(-8),
+          userText: rawUserText.trim(),
+          history: cleanHistoryForServer.slice(-8),
         });
-        const updated: ChatHistoryEntry[] = [
+        setHistory([
           ...nextHistory,
           { role: 'assistant', content: response.reply },
-        ];
-        setHistory(updated);
+        ]);
         speakReply(response.reply);
+        triggerHaptic('success');
       } catch (err) {
-        // Серверная сетевая ошибка → локальный фолбэк из scripted
+        const scriptedPool = animal.scriptedReplies ?? [];
+        // Индекс ДОЛЖЕН быть целым — делим на 2 и округляем вниз, иначе
+        // arr[1.5] = undefined и в чат попадёт пустая реплика.
         const scripted =
-          animal.scriptedReplies && animal.scriptedReplies.length > 0
-            ? animal.scriptedReplies[
-                Math.floor(Math.random() * animal.scriptedReplies.length)
-              ]!
+          scriptedPool.length > 0
+            ? scriptedPool[Math.floor(historyRef.current.length / 2) % scriptedPool.length]!
             : animal.greeting;
-        setHistory([...nextHistory, { role: 'assistant', content: scripted }]);
+        setHistory([
+          ...nextHistory,
+          { role: 'assistant', content: scripted },
+        ]);
         speakReply(scripted);
         if (__DEV__) {
           // eslint-disable-next-line no-console
@@ -157,7 +225,7 @@ export function AnimalDetailScreen({ animalId }: Props) {
     if (scrollRef.current) {
       requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
     }
-  }, [history]);
+  }, [history, isThinking]);
 
   if (!animal) {
     return (
@@ -193,13 +261,16 @@ export function AnimalDetailScreen({ animalId }: Props) {
         <View style={styles.back} />
       </View>
 
+      {/* Сцена — фиксированная высота, небольшая */}
       <View style={styles.sceneWrap}>
-        <AnimalScene asset={asset} animation="greet" />
+        <AnimalScene asset={asset} animation="greet" width={220} height={180} />
       </View>
 
+      {/* Чат — занимает всё оставшееся место, скроллится */}
       <ScrollView
         ref={scrollRef}
-        contentContainerStyle={styles.historyScroll}
+        style={styles.chat}
+        contentContainerStyle={styles.chatContent}
         showsVerticalScrollIndicator={false}
       >
         {history.map((m, i) => (
@@ -207,19 +278,25 @@ export function AnimalDetailScreen({ animalId }: Props) {
             key={i}
             style={[styles.bubble, m.role === 'user' ? styles.bubbleUser : styles.bubbleAnimal]}
           >
-            <Text style={[styles.bubbleText, m.role === 'user' && styles.bubbleUserText]}>
+            <Text
+              style={[
+                styles.bubbleText,
+                m.role === 'user' && styles.bubbleUserText,
+                m.sanitized && styles.bubbleSanitizedText,
+              ]}
+            >
               {m.content}
             </Text>
           </View>
         ))}
         {isThinking ? (
-          <View style={[styles.bubble, styles.bubbleAnimal, styles.thinking]}>
-            <ActivityIndicator size="small" color={theme.colors.accent} />
-            <Text style={styles.thinkingText}>думает…</Text>
+          <View style={[styles.bubble, styles.bubbleAnimal, styles.thinkingBubble]}>
+            <TypingIndicator />
           </View>
         ) : null}
       </ScrollView>
 
+      {/* Quick-кнопки — компактные */}
       <View style={styles.quickRow}>
         {QUICK_QUESTIONS.map((q) => (
           <Pressable
@@ -233,16 +310,23 @@ export function AnimalDetailScreen({ animalId }: Props) {
               isThinking && styles.quickDisabled,
             ]}
           >
-            <Text style={styles.quickText}>{q}</Text>
+            <Text style={styles.quickText} numberOfLines={1}>
+              {q}
+            </Text>
           </Pressable>
         ))}
       </View>
 
-      {voice.available ? (
-        <MicButton state={voice.micState} transcript={voice.transcript} onPress={voice.toggle} />
-      ) : (
-        <Text style={styles.voiceHint}>Нажми вопрос сверху, чтобы поговорить.</Text>
-      )}
+      {/* Микрофон — самый низ */}
+      <View style={styles.micZone}>
+        {voice.available ? (
+          <MicButton state={voice.micState} transcript={voice.transcript} onPress={voice.toggle} />
+        ) : (
+          <Text style={styles.voiceHint}>
+            На этом устройстве голос не поддерживается. Выбери вопрос выше ↑
+          </Text>
+        )}
+      </View>
     </SafeAreaView>
   );
 }
@@ -257,7 +341,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
   },
   back: {
     minWidth: 90,
@@ -275,30 +359,40 @@ const styles = StyleSheet.create({
   },
   sceneWrap: {
     alignItems: 'center',
+    paddingBottom: theme.spacing.sm,
+  },
+  chat: {
+    flex: 1,
     paddingHorizontal: theme.spacing.lg,
   },
-  historyScroll: {
-    padding: theme.spacing.lg,
+  chatContent: {
+    paddingVertical: theme.spacing.md,
     gap: theme.spacing.sm,
-    flexGrow: 1,
   },
   bubble: {
-    maxWidth: '85%',
-    padding: theme.spacing.md,
-    borderRadius: theme.radii.md,
+    maxWidth: '82%',
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: 18,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
     elevation: 1,
   },
   bubbleAnimal: {
     alignSelf: 'flex-start',
     backgroundColor: theme.colors.surface,
+    borderBottomLeftRadius: 6,
   },
   bubbleUser: {
     alignSelf: 'flex-end',
     backgroundColor: theme.colors.accent,
+    borderBottomRightRadius: 6,
+  },
+  thinkingBubble: {
+    paddingVertical: theme.spacing.xs,
+    minWidth: 60,
   },
   bubbleText: {
     fontSize: 16,
@@ -309,27 +403,21 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '600',
   },
-  thinking: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: theme.spacing.sm,
-  },
-  thinkingText: {
-    fontSize: 14,
-    color: theme.colors.textMuted,
+  bubbleSanitizedText: {
     fontStyle: 'italic',
+    opacity: 0.9,
   },
   quickRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: theme.spacing.sm,
+    gap: theme.spacing.xs,
     paddingHorizontal: theme.spacing.md,
-    paddingBottom: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
   },
   quickBtn: {
     paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.sm,
+    paddingVertical: theme.spacing.xs + 2,
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radii.full,
     borderWidth: 1,
@@ -339,15 +427,18 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   quickText: {
-    fontSize: 14,
+    fontSize: 13,
     color: theme.colors.text,
     fontWeight: '600',
+  },
+  micZone: {
+    paddingBottom: theme.spacing.sm,
   },
   voiceHint: {
     padding: theme.spacing.md,
     textAlign: 'center',
     color: theme.colors.textMuted,
-    fontSize: 14,
+    fontSize: 13,
   },
   center: {
     flex: 1,

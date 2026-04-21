@@ -43,7 +43,7 @@ export class ChatService {
     // 1. Проверяем вход — не пропускаем мат/попытки выманить персональные данные.
     const inputCheck = this.moderation.screenInput(input.userText);
     if (!inputCheck.allowed) {
-      const scriptedReply = await this.fallbackReply(input.animalId);
+      const scriptedReply = await this.fallbackReply(input.animalId, input.history.length);
       await this.logMessage(input, 'USER', input.userText, inputCheck.flags);
       await this.logMessage(input, 'ASSISTANT', scriptedReply, ['filtered-input']);
       return { reply: scriptedReply, source: 'moderation-blocked', moderationFlags: inputCheck.flags };
@@ -79,14 +79,14 @@ export class ChatService {
       this.logger.warn(
         `LLM недоступен, фолбэк на scripted для ${input.animalId}: ${err instanceof Error ? err.message : String(err)}`,
       );
-      reply = await this.fallbackReply(input.animalId);
+      reply = await this.fallbackReply(input.animalId, input.history.length);
       source = 'scripted';
     }
 
     // 5. Пост-модерация ответа.
     const outputCheck = this.moderation.screenOutput(reply);
     if (!outputCheck.allowed) {
-      const scripted = await this.fallbackReply(input.animalId);
+      const scripted = await this.fallbackReply(input.animalId, input.history.length);
       await this.logMessage(input, 'ASSISTANT', reply, ['filtered-output', ...outputCheck.flags]);
       return { reply: scripted, source: 'moderation-blocked', moderationFlags: outputCheck.flags };
     }
@@ -102,15 +102,34 @@ export class ChatService {
     }
   }
 
-  private async fallbackReply(animalId: string): Promise<string> {
+  /**
+   * Выбираем scripted-реплику так, чтобы она НЕ повторялась:
+   *  - Первая реплика = greeting (индекс 0).
+   *  - На каждый следующий ответ берём индекс `1 + (assistantMsgCount - 1) % (len - 1)`,
+   *    т.е. циклически проходим по тематическим репликам.
+   *  - Если scripted-реплик нет — возвращаем дежурное приветствие.
+   *
+   * `historyLength` = длина истории, которую прислал клиент. Используем её как
+   * proxy для «сколько уже было обменов». У нас история содержит user+assistant
+   * пары, так что деление на 2 даёт примерное число ассистентских сообщений.
+   */
+  private async fallbackReply(animalId: string, historyLength = 0): Promise<string> {
     const animal = await this.prisma.contentAnimal.findUnique({ where: { id: animalId } });
     if (!animal) return 'Давай поиграем!';
     const replies = Array.isArray(animal.scriptedReplies)
       ? (animal.scriptedReplies.filter((s): s is string => typeof s === 'string') as readonly string[])
       : [];
     if (replies.length === 0) return `Привет! Я ${animal.title}.`;
-    const index = Math.floor(Math.random() * replies.length);
-    return replies[index] ?? replies[0]!;
+    if (replies.length === 1) return replies[0]!;
+
+    // `history` приходит от клиента БЕЗ текущего USER-сообщения (оно ещё не
+    // в истории). Длина — это сколько user+assistant пар уже было до этого.
+    // `Math.floor(historyLength / 2)` = порядковый номер будущего ответа ассистента.
+    const assistantIndex = Math.floor(historyLength / 2);
+    // Индекс 0 = greeting; ответы циклим по [1, len-1].
+    const nonGreetingCount = replies.length - 1;
+    const idx = 1 + (assistantIndex % nonGreetingCount);
+    return replies[idx] ?? replies[0]!;
   }
 
   private buildSystemPrompt(animalPrompt: string): string {

@@ -36,6 +36,10 @@ describe('ModerationService', () => {
     it('блокирует мат', () => {
       expect(svc.screenOutput('ты сука ленивый').allowed).toBe(false);
     });
+    it('блокирует мат в конце предложения (без пробела после)', () => {
+      // Регрессия: trailing space в blocklist ('сука ') пропускал слово в конце.
+      expect(svc.screenOutput('ты мелкая сука').allowed).toBe(false);
+    });
     it('блокирует слишком длинный ответ', () => {
       const long = 'а'.repeat(801);
       const res = svc.screenOutput(long);

@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ServicesProvider } from '@/services/di/provider';
 import { ConsentGate } from '@/shared/screens/consent-gate';
+import { SkiaInit } from '@/shared/screens/skia-init';
 
 export default function RootLayout() {
   const queryClient = useMemo(
@@ -29,15 +30,17 @@ export default function RootLayout() {
         <QueryClientProvider client={queryClient}>
           <ServicesProvider>
             <StatusBar style="dark" />
-            <ConsentGate>
-              <Stack
-                screenOptions={{
-                  headerShown: false,
-                  animation: 'fade',
-                  contentStyle: { backgroundColor: '#FFF4E0' },
-                }}
-              />
-            </ConsentGate>
+            <SkiaInit>
+              <ConsentGate>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    animation: 'fade',
+                    contentStyle: { backgroundColor: '#FFF4E0' },
+                  }}
+                />
+              </ConsentGate>
+            </SkiaInit>
           </ServicesProvider>
         </QueryClientProvider>
       </SafeAreaProvider>

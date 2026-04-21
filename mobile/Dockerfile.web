@@ -21,6 +21,12 @@ COPY . .
 # Экспорт web-сборки (Expo SDK 52+, output: 'single' → SPA в dist-web/)
 RUN npx expo export --platform web --output-dir dist-web
 
+# canvaskit.wasm — Skia (react-native-skia) на web использует CanvasKit-WASM.
+# По умолчанию CanvasKit ищет WASM относительно текущего URL; SkiaInit в _layout.tsx
+# переопределяет `locateFile` на абсолютный "/canvaskit.wasm" — поэтому копируем
+# сам файл в корень статики.
+RUN cp node_modules/canvaskit-wasm/bin/full/canvaskit.wasm dist-web/canvaskit.wasm
+
 # ───── runtime ─────
 FROM nginx:1.27-alpine AS runtime
 

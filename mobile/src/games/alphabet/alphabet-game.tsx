@@ -1,9 +1,10 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useService } from '@/services/di/provider';
 import type { AlphabetContent } from '@/services/content-repo/types';
 import { theme } from '@/shared/theme';
 
@@ -12,10 +13,12 @@ import { AnimalRevealCard } from './components/animal-reveal-card';
 import { HintBanner } from './components/hint-banner';
 import { LetterCard } from './components/letter-card';
 import { MicButton } from './components/mic-button';
+import { MicErrorBanner } from './components/mic-error-banner';
 import { ProgressPips } from './components/progress-pips';
 import { StarsBanner } from './components/stars-banner';
 import { WordReveal } from './components/word-reveal';
 import { MAX_RETRIES } from './fsm/types';
+import { humanizeAsrError } from './hooks/humanize-asr-error';
 import { useAlphabetMachine } from './hooks/use-alphabet-machine';
 import { useLetterMastery } from './hooks/use-letter-mastery';
 import { useProgressSync } from './hooks/use-progress-sync';
@@ -41,13 +44,36 @@ function tryHaptic(style: Haptics.ImpactFeedbackStyle | 'success'): void {
   }
 }
 
-interface AlphabetGameProps {
-  readonly content: AlphabetContent;
+/**
+ * Подсказка под кнопками, когда ASR-сервис недоступен (StubAsr на native до M3.5,
+ * Firefox без Web Speech на web). Ребёнок должен видеть, что микрофона нет
+ * специально, а не из-за сломанной игры.
+ */
+function NoMicHint() {
+  return (
+    <View style={styles.noMicHint} accessibilityRole="text">
+      <Text style={styles.noMicHintText}>Сегодня без микрофона — нажимай на кнопки!</Text>
+    </View>
+  );
 }
 
-export function AlphabetGame({ content }: AlphabetGameProps) {
+interface AlphabetGameProps {
+  readonly content: AlphabetContent;
+  readonly initialWordIndex: number;
+  readonly initialTotalStars: number;
+  readonly onProgressChange: (progress: { wordIndex: number; totalStars: number }) => void;
+}
+
+export function AlphabetGame({
+  content,
+  initialWordIndex,
+  initialTotalStars,
+  onProgressChange,
+}: AlphabetGameProps) {
   const router = useRouter();
+  const tts = useService('speechSynthesis');
   const mastery = useLetterMastery(content.words);
+  const [asrError, setAsrError] = useState<string | null>(null);
 
   // Подсовываем FSM упорядоченный по mastery список, чтобы первыми шли слова
   // со сложными буквами. Пока не загрузили snapshot — используем обычный порядок.
@@ -55,25 +81,26 @@ export function AlphabetGame({ content }: AlphabetGameProps) {
   orderedContent.current = mastery.loaded ? { ...content, words: mastery.ordered } : content;
 
   const { state, send, word, letter, animal, mode, letterIndex, letterRetries, wordRetries } =
-    useAlphabetMachine({ content: orderedContent.current });
+    useAlphabetMachine({
+      content: orderedContent.current,
+      initialWordIndex,
+      initialTotalStars,
+    });
+
+  // Persist текущего прогресса: при любом изменении wordIndex/totalStars
+  // сохраняем в KV-storage (внутри debounce через сравнение в save()).
+  useEffect(() => {
+    onProgressChange({
+      wordIndex: state.context.wordIndex,
+      totalStars: state.context.totalStars,
+    });
+  }, [state.context.wordIndex, state.context.totalStars, onProgressChange]);
 
   const lastStats = useRef({ correct: 0, wrong: 0 });
 
-  useEffect(() => {
-    if (state.matches('showLetter') || state.matches('showWord')) {
-      const timer = setTimeout(() => send({ type: 'LETTER_SHOWN' }), 1200);
-      return () => clearTimeout(timer);
-    }
-    if (state.matches('revealAnimal')) {
-      const timer = setTimeout(() => send({ type: 'SCENE_READY' }), 1400);
-      return () => clearTimeout(timer);
-    }
-    if (state.matches('done')) {
-      const timer = setTimeout(() => send({ type: 'START' }), 900);
-      return () => clearTimeout(timer);
-    }
-    return undefined;
-  }, [state, send]);
+  // Автопереходы showLetter/showWord → listen*, revealAnimal → sceneReady,
+  // done → следующий цикл живут в useAlphabetMachine и синхронизированы
+  // с окончанием TTS, чтобы фразы не обрывались.
 
   useEffect(() => {
     const { correct, wrong } = state.context.stats;
@@ -92,7 +119,23 @@ export function AlphabetGame({ content }: AlphabetGameProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.context.stats]);
 
-  const goHome = () => router.back();
+  // В idle ещё нечего терять — выходим сразу. Иначе подтверждаем, чтобы
+  // случайный тап по «Домой» не прервал середину слова/сцены.
+  const goHome = () => {
+    if (state.matches('idle')) {
+      router.back();
+      return;
+    }
+    Alert.alert(
+      'Выйти?',
+      'Прогресс сохранится, ты сможешь продолжить в любой момент.',
+      [
+        { text: 'Остаться', style: 'cancel' },
+        { text: 'Выйти', style: 'destructive', onPress: () => router.back() },
+      ],
+      { cancelable: true },
+    );
+  };
   const submitCorrectLetter = () => {
     if (letter) send({ type: 'SUBMIT_LETTER', value: letter });
   };
@@ -115,13 +158,36 @@ export function AlphabetGame({ content }: AlphabetGameProps) {
     active: voiceActive,
     grammar: voiceGrammar,
     onFinal: (transcript) => {
+      setAsrError(null);
       if (listeningLetter) {
         send({ type: 'SUBMIT_LETTER', value: transcript });
       } else if (listeningWord) {
         send({ type: 'SUBMIT_WORD', value: transcript });
       }
     },
+    onError: (message) => {
+      const friendly = humanizeAsrError(message);
+      setAsrError(friendly);
+      void tts.speak(friendly);
+    },
   });
+
+  // Гасим «прилипший» error при переходе к новой букве/слову, чтобы он не
+  // накрывал следующий шаг. `letterIndex`/`wordIndex` меняются на каждом шаге FSM.
+  useEffect(() => {
+    setAsrError(null);
+  }, [letterIndex, word?.word]);
+
+  // Одноразовая озвучка для режима без микрофона: ребёнок должен понять,
+  // что ему не сломали игру — просто нужно тапать кнопки. После первого
+  // входа в listen*-состояние с недоступным ASR — говорим и больше не повторяем.
+  const announcedNoMicRef = useRef(false);
+  useEffect(() => {
+    if (voiceActive && !voice.available && !announcedNoMicRef.current) {
+      announcedNoMicRef.current = true;
+      void tts.speak('Сегодня без микрофона. Нажимай на большие кнопки.');
+    }
+  }, [voiceActive, voice.available, tts]);
 
   useProgressSync({
     stateValue: String(state.value),
@@ -166,7 +232,16 @@ export function AlphabetGame({ content }: AlphabetGameProps) {
           <Text style={styles.backText}>← Домой</Text>
         </Pressable>
         <Text style={styles.wordLabel}>{word.word.toUpperCase()}</Text>
-        <View style={styles.back} />
+        <View style={[styles.back, styles.starsCell]}>
+          {state.context.totalStars > 0 ? (
+            <Text
+              style={styles.starsCounter}
+              accessibilityLabel={`Накоплено звёзд: ${state.context.totalStars}`}
+            >
+              ⭐ {state.context.totalStars}
+            </Text>
+          ) : null}
+        </View>
       </View>
 
       <ProgressPips
@@ -175,6 +250,7 @@ export function AlphabetGame({ content }: AlphabetGameProps) {
       />
 
       <View style={styles.body}>{body}</View>
+      {asrError ? <MicErrorBanner message={asrError} onDismiss={() => setAsrError(null)} /> : null}
     </SafeAreaView>
   );
 
@@ -201,6 +277,8 @@ export function AlphabetGame({ content }: AlphabetGameProps) {
       state.matches('hintLetter')
     ) {
       const showMic = voice.available && listeningLetter;
+      // В listen-режиме без микрофона — ребёнок должен видеть, почему нет иконки.
+      const showNoMicHint = !voice.available && listeningLetter;
       if (mode === 'letter_inside_word' && letter) {
         return (
           <>
@@ -213,6 +291,7 @@ export function AlphabetGame({ content }: AlphabetGameProps) {
             {showMic ? (
               <MicButton state={voice.micState} transcript={voice.transcript} onPress={voice.toggle} />
             ) : null}
+            {showNoMicHint ? <NoMicHint /> : null}
             {state.matches('hintLetter') ? (
               <HintBanner
                 message={word!.letterHints[letter] ?? `Это буква ${letter.toUpperCase()}.`}
@@ -240,6 +319,7 @@ export function AlphabetGame({ content }: AlphabetGameProps) {
           {showMic ? (
             <MicButton state={voice.micState} transcript={voice.transcript} onPress={voice.toggle} />
           ) : null}
+          {showNoMicHint ? <NoMicHint /> : null}
           {state.matches('hintLetter') && letter ? (
             <HintBanner
               message={word!.letterHints[letter] ?? `Это буква ${letter.toUpperCase()}.`}
@@ -269,12 +349,14 @@ export function AlphabetGame({ content }: AlphabetGameProps) {
       state.matches('hintWord')
     ) {
       const showMic = voice.available && listeningWord;
+      const showNoMicHint = !voice.available && listeningWord;
       return (
         <>
           <WordReveal letters={word!.letters} onTap={submitCorrectWord} hint="Прочитай слово" />
           {showMic ? (
             <MicButton state={voice.micState} transcript={voice.transcript} onPress={voice.toggle} />
           ) : null}
+          {showNoMicHint ? <NoMicHint /> : null}
           {state.matches('hintWord') ? (
             <HintBanner
               message={`Это слово — ${word!.word.toUpperCase()}.`}
@@ -383,5 +465,29 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: theme.spacing.md,
     paddingTop: theme.spacing.md,
+  },
+  noMicHint: {
+    marginHorizontal: theme.spacing.lg,
+    marginBottom: theme.spacing.sm,
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    borderRadius: theme.radii.md,
+    backgroundColor: theme.colors.surface,
+    alignItems: 'center',
+  },
+  noMicHintText: {
+    fontSize: 16,
+    color: theme.colors.textMuted,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  starsCell: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  starsCounter: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#D89B00',
   },
 });

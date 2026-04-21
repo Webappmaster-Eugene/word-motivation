@@ -10,8 +10,21 @@ import { ANIMALS as FALLBACK_ANIMALS } from '../content/words';
 import { currentLetter, currentWord } from '../fsm/guards';
 import { alphabetMachine } from '../fsm/machine';
 
+/**
+ * Минимальное время отображения буквы/слова/сцены до автоперехода.
+ * Даже если TTS закончит раньше (например, на web-SpeechSynthesis-stub),
+ * ребёнок должен успеть рассмотреть. Подобрано под возраст 6–12.
+ */
+const MIN_DISPLAY_MS = {
+  letter: 1500,
+  scene: 3000,
+  done: 1200,
+} as const;
+
 interface UseAlphabetMachineOptions {
   readonly content: AlphabetContent | undefined;
+  readonly initialWordIndex?: number;
+  readonly initialTotalStars?: number;
 }
 
 /**
@@ -24,13 +37,21 @@ interface UseAlphabetMachineOptions {
  * react-query + ContentRepo. Если контент ещё грузится — machine ждёт
  * в `idle`, а `word`/`letter`/`animal` будут `null`.
  */
-export function useAlphabetMachine({ content }: UseAlphabetMachineOptions) {
+export function useAlphabetMachine({
+  content,
+  initialWordIndex,
+  initialTotalStars,
+}: UseAlphabetMachineOptions) {
   const tts = useService('speechSynthesis');
   const words: readonly WordEntry[] = content?.words ?? [];
   const animals = content?.animals ?? FALLBACK_ANIMALS;
 
   const [state, send, actor] = useMachine(alphabetMachine, {
-    input: { words: words.length > 0 ? words : undefined },
+    input: {
+      words: words.length > 0 ? words : undefined,
+      wordIndex: initialWordIndex,
+      totalStars: initialTotalStars,
+    },
   });
 
   const word: WordEntry | null = useMemo(() => {
@@ -48,33 +69,60 @@ export function useAlphabetMachine({ content }: UseAlphabetMachineOptions) {
     return animals[word.animalId] ?? null;
   }, [word, animals]);
 
-  // ── Side-effect: TTS при входе в ключевые состояния ────────────────────────
+  // ── Side-effect: TTS + авто-переход по окончании речи ─────────────────────
+  // Стратегия: ждём `max(речь, минимальный floor)`, затем шлём событие перехода.
+  // Это убирает жёсткие таймауты — ребёнок успевает рассмотреть даже короткие фразы,
+  // и ни одна фраза не обрывается на полуслове. Auto-advance отменяется при
+  // unmount/смене состояния через флаг `cancelled`.
   useEffect(() => {
     if (!word) return undefined;
     const value = state.value;
-    if (value === 'showLetter' && letter) {
+    let cancelled = false;
+
+    const speakAndAdvance = async (phrase: string, minMs: number, nextEvent: Parameters<typeof send>[0] | null) => {
+      const minTimer = new Promise<void>((resolve) => setTimeout(resolve, minMs));
+      await Promise.all([tts.speak(phrase), minTimer]);
+      if (!cancelled && nextEvent) send(nextEvent);
+    };
+
+    if (value === 'idle') {
+      // Приветствие при входе в игру: ребёнок, который ещё не читает,
+      // должен услышать, что делать.
+      void tts.speak('Привет! Готов учить буквы? Нажми на большую кнопку «Начать».');
+    } else if (value === 'showLetter' && letter) {
       const phrase =
         state.context.mode === 'letter_inside_word'
           ? `В слове ${word.word} спряталась буква ${letter.toUpperCase()}. Давай прочитаем слово.`
           : `Буква ${letter.toUpperCase()}.`;
-      void tts.speak(phrase);
+      void speakAndAdvance(phrase, MIN_DISPLAY_MS.letter, { type: 'LETTER_SHOWN' });
     } else if (value === 'showWord') {
-      void tts.speak(`Прочитай слово: ${word.word}.`);
+      void speakAndAdvance(
+        `Прочитай слово: ${word.word}.`,
+        MIN_DISPLAY_MS.letter,
+        { type: 'LETTER_SHOWN' },
+      );
     } else if (value === 'hintLetter' && letter) {
       const hint = word.letterHints[letter] ?? `Это буква ${letter.toUpperCase()}.`;
       void tts.speak(hint);
     } else if (value === 'hintWord') {
       void tts.speak(`Скажи слово ${word.word}.`);
     } else if (value === 'revealAnimal' && animal) {
-      void tts.speak(`${animal.title}! ${animal.greeting}`);
+      void speakAndAdvance(
+        `${animal.title}! ${animal.greeting}`,
+        MIN_DISPLAY_MS.scene,
+        { type: 'SCENE_READY' },
+      );
+    } else if (value === 'done') {
+      void speakAndAdvance('Молодец!', MIN_DISPLAY_MS.done, { type: 'START' });
     }
 
     return () => {
+      cancelled = true;
       if (Platform.OS !== 'web') {
         void tts.cancel();
       }
     };
-  }, [state.value, state.context.mode, letter, word, animal, tts]);
+  }, [state.value, state.context.mode, letter, word, animal, tts, send]);
 
   return {
     state,

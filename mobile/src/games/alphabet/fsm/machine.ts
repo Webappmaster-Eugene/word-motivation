@@ -28,7 +28,7 @@ export const alphabetMachine = setup({
   types: {
     context: {} as AlphabetContext,
     events: {} as AlphabetEvent,
-    input: {} as Partial<Pick<AlphabetContext, 'words' | 'wordIndex'>>,
+    input: {} as Partial<Pick<AlphabetContext, 'words' | 'wordIndex' | 'totalStars'>>,
   },
 
   guards: {
@@ -122,6 +122,7 @@ export const alphabetMachine = setup({
     ...initialContext,
     ...(input?.words ? { words: input.words } : {}),
     ...(input?.wordIndex !== undefined ? { wordIndex: input.wordIndex } : {}),
+    ...(input?.totalStars !== undefined ? { totalStars: input.totalStars } : {}),
   }),
 
   states: {

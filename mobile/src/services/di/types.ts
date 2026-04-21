@@ -3,6 +3,7 @@ import type { ApiClient } from '@/services/api-client/api-client';
 import type { DeviceAuthService } from '@/services/auth/device-auth-service';
 import type { ContentRepo } from '@/services/content-repo/types';
 import type { LlmChatClient } from '@/services/llm-chat/llm-chat';
+import type { LocalUnlockedRepo } from '@/services/mastery/local-unlocked';
 import type { LetterMasteryRepo } from '@/services/mastery/letter-mastery';
 import type { ProgressApi } from '@/services/progress-api/progress-api';
 import type { SpeechRecognitionService } from '@/services/speech-recognition/types';
@@ -18,6 +19,7 @@ export interface ServiceBundle {
   readonly progressApi: ProgressApi;
   readonly llmChat: LlmChatClient;
   readonly letterMastery: LetterMasteryRepo;
+  readonly localUnlocked: LocalUnlockedRepo;
 }
 
 export type ServiceToken<T> = symbol & { readonly __brand: T };

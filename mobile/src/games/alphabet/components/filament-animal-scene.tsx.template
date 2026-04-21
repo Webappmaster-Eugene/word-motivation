@@ -1,0 +1,120 @@
+/**
+ * ════════════════════════════════════════════════════════════════════════════
+ * FILAMENT 3D SCENE — ШАБЛОН ДЛЯ ПОДКЛЮЧЕНИЯ (M4.5)
+ * ════════════════════════════════════════════════════════════════════════════
+ *
+ * Этот файл — заготовка. Чтобы активировать настоящий 3D-рендер:
+ *
+ * 1. Скачай CC0-модели животных:
+ *    - Quaternius "Ultimate Animated Animals" (CC0):
+ *      https://quaternius.com/packs/ultimateanimatedanimals.html
+ *    - Распакуй в `mobile/assets/models/*.glb` (имена должны совпадать с
+ *      `ContentAnimal.id` в БД: dog.glb, cat.glb, lion.glb и т.д.)
+ *    - Оптимизируй через `npx gltf-transform draco + quantize` (цель <500KB/модель)
+ *
+ * 2. Установи native-модуль:
+ *    ```
+ *    cd project/mobile
+ *    npm install react-native-filament @marginalized/react-native-worklets-core
+ *    ```
+ *
+ * 3. Rebuild dev-client:
+ *    ```
+ *    npx expo prebuild --clean
+ *    npx expo run:android       # локально
+ *    # или
+ *    npx eas build --profile development --platform android
+ *    ```
+ *
+ * 4. Переименуй этот файл:
+ *    `filament-animal-scene.tsx.template` → `filament-animal-scene.native.tsx`
+ *
+ *    Также переименуй существующий 2D-компонент:
+ *    `animal-scene.tsx` → `animal-scene.web.tsx`
+ *
+ *    Metro автоматически подставит `.native.tsx` на iOS/Android и `.web.tsx` на web.
+ *
+ * 5. Раскомментируй код ниже.
+ *
+ * ════════════════════════════════════════════════════════════════════════════
+ */
+
+/*
+
+import { FilamentScene, FilamentView, Camera, DefaultLight, Model } from 'react-native-filament';
+import { StyleSheet, View, Text } from 'react-native';
+import { useMemo } from 'react';
+
+import { theme } from '@/shared/theme';
+
+import type { AnimalSceneAsset, SceneAnimation } from '@/services/animal-scene/types';
+
+interface Props {
+  readonly asset: AnimalSceneAsset;
+  readonly animation?: SceneAnimation;
+  readonly width?: number;
+  readonly height?: number;
+}
+
+// Маппинг animalId → GLB-путь. Добавляй новые по мере появления моделей.
+// require() должен быть статическим — Metro должен видеть все пути на этапе bundling.
+const MODEL_MAP: Record<string, number> = {
+  dog: require('@assets/models/dog.glb'),
+  cat: require('@assets/models/cat.glb'),
+  lion: require('@assets/models/lion.glb'),
+  // ... остальные 50 животных
+};
+
+export function AnimalScene({ asset, animation = 'greet', width = 360, height = 320 }: Props) {
+  const modelSource = useMemo(() => MODEL_MAP[asset.id], [asset.id]);
+
+  if (!modelSource) {
+    // Нет GLB под это животное — fallback на 2D-сцену.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { AnimalScene: SkiaScene } = require('./animal-scene.web');
+    return <SkiaScene asset={asset} animation={animation} width={width} height={height} />;
+  }
+
+  return (
+    <View style={[styles.wrap, { width, height, backgroundColor: asset.color }]}>
+      <FilamentScene>
+        <FilamentView style={StyleSheet.absoluteFill}>
+          <Camera />
+          <DefaultLight />
+          <Model
+            source={modelSource}
+            // animationIndex можно подобрать из метаданных модели (idle=0, walk=1, ...)
+            animationIndex={animation === 'dance' ? 2 : animation === 'greet' ? 1 : 0}
+            translate={[0, 0, 0]}
+            scale={[1, 1, 1]}
+          />
+        </FilamentView>
+      </FilamentScene>
+      <Text style={styles.title}>{asset.title}</Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  wrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 24,
+    overflow: 'hidden',
+  },
+  title: {
+    position: 'absolute',
+    top: 16,
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
+  },
+});
+
+*/

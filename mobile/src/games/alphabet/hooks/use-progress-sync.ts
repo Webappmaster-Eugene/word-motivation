@@ -39,6 +39,7 @@ export function useProgressSync({
   animalId,
 }: UseProgressSyncOptions): void {
   const progress = useService('progressApi');
+  const localUnlocked = useService('localUnlocked');
 
   const sessionIdRef = useRef<string | null>(null);
   const lastCorrectRef = useRef(0);
@@ -115,17 +116,21 @@ export function useProgressSync({
   }, [statsCorrect, statsWrong, stateValue, word, letter, progress]);
 
   // Unlock animal — один раз на сессию на каждое открытие.
+  // Пишем в local-store немедленно + пытаемся на backend.
   useEffect(() => {
     if (stateValue !== 'revealAnimal' || !animalId) return;
     if (unlockedAnimalsRef.current.has(animalId)) return;
     unlockedAnimalsRef.current.add(animalId);
+    void localUnlocked.unlock(animalId).catch(() => {
+      /* non-fatal */
+    });
     progress.unlockAnimal(animalId).catch((err) => {
       if (__DEV__) {
         // eslint-disable-next-line no-console
-        console.warn('progress.unlockAnimal упал:', err);
+        console.warn('progress.unlockAnimal упал (local-unlock сохранён):', err);
       }
     });
-  }, [stateValue, animalId, progress]);
+  }, [stateValue, animalId, progress, localUnlocked]);
 
   // End-of-session: при unmount или done-состоянии завершаем сессию.
   useEffect(() => {
