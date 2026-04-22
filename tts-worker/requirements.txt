@@ -1,13 +1,19 @@
 # Silero v4_ru — основная модель. Распространяется автором через torch.hub,
-# скачивается при старте, весит ~60 МБ.
+# скачивается при первом запуске, весит ~60 МБ.
 #
-# torch: CPU-only wheel. ЯВНО задаём 2.4 чтобы не тянуть gigabyte GPU-зависимостей.
-# Для Silero v4 2.x — рабочая ветка (модель упакована через torch.package,
-# совместима с 2.0+).
-torch==2.4.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+# torch: CPU-only wheel. Версия `2.4.1+cpu` существует ТОЛЬКО в индексе
+# download.pytorch.org/whl/cpu — её нет на PyPI. Поэтому:
+#  1. Дополнительный индекс обязательно прописан ОТДЕЛЬНОЙ строкой
+#     (pip не принимает `--extra-index-url` inline рядом с пакетом).
+#  2. `torch==2.4.1+cpu` гарантирует, что берём CPU-only билд без CUDA
+#     (иначе PyPI отдал бы ~2 ГБ GPU-зависимостей).
+# Для Silero v4 версии 2.x подходят (модель упакована через torch.package,
+# совместима с PyTorch 2.0+).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.4.1+cpu
 numpy==1.26.4
 
-# FastAPI + uvicorn — HTTP-обёртка.
+# FastAPI + uvicorn — HTTP-обёртка. Пакеты тянутся с обычного PyPI.
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
 pydantic==2.10.3
