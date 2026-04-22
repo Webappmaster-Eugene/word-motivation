@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 
 import type { AppConfig } from '../../config/env.schema';
 
-import type { CachedEntry } from './cache/tts-cache.service';
 import { TtsCacheService } from './cache/tts-cache.service';
 import { SYNTHESIZER } from './synthesizer/synthesizer.token';
 import { SynthesisError, type SileroVoice, type Synthesizer } from './synthesizer/types';

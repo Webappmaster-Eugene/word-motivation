@@ -10,6 +10,7 @@ import Animated, {
 
 import { useService } from '@/services/di/provider';
 import type { AnimalSceneAsset } from '@/services/animal-scene/types';
+import { contrastSecondaryColor, contrastTextColor } from '@/shared/theme/contrast';
 import { theme } from '@/shared/theme';
 
 import type { AnimalInfo } from '../content/types';
@@ -68,18 +69,26 @@ export function AnimalRevealCard({
   }));
 
   if (chatEnabled) {
+    const heroFg = contrastTextColor(animal.color);
+    const heroSecondaryFg = contrastSecondaryColor(animal.color);
     return (
       <View style={styles.chatContainer}>
-        <View style={styles.sceneCompact}>
+        {/* Hero-баннер: цвет животного, scene + title посередине, без Верхнего padding'а (у AlphabetGame есть свой header). */}
+        <View style={[styles.hero, { backgroundColor: animal.color }]}>
           {sceneReady ? (
-            <AnimalScene asset={asset} animation="greet" />
+            <AnimalScene asset={asset} animation="greet" width={180} height={150} />
           ) : (
             <View style={styles.loaderCompact}>
               <Text style={styles.loaderText}>Готовим сцену…</Text>
             </View>
           )}
+          <Text style={[styles.heroTitle, { color: heroFg }]}>{animal.title}</Text>
+          <Text style={[styles.heroSubtitle, { color: heroSecondaryFg }]}>
+            Спроси о чём угодно — отвечу!
+          </Text>
         </View>
 
+        {/* Чат: max-width контейнер, так bubble остаются рядом со scene. */}
         <View style={styles.chatArea}>
           <AnimalChat sessionId={sessionId} animal={animal} />
         </View>
@@ -179,15 +188,36 @@ const styles = StyleSheet.create({
   chatContainer: {
     flex: 1,
     gap: theme.spacing.sm,
+    maxWidth: 760,
+    width: '100%',
+    alignSelf: 'center',
   },
-  sceneCompact: {
-    height: 200,
+  hero: {
+    paddingTop: theme.spacing.sm,
+    paddingBottom: theme.spacing.lg,
+    borderRadius: theme.radii.lg,
+    marginHorizontal: theme.spacing.lg,
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: theme.spacing.xs,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  heroTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  heroSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   loaderCompact: {
     width: 160,
-    height: 160,
+    height: 150,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: theme.radii.lg,
@@ -195,6 +225,7 @@ const styles = StyleSheet.create({
   },
   chatArea: {
     flex: 1,
+    minHeight: 200,
   },
   ctaCompact: {
     alignSelf: 'center',
