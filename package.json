@@ -1,0 +1,17 @@
+{
+  "name": "90games-root",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Корневой package.json — только для dev-инструментов (lefthook). Не содержит рантайм-зависимостей приложения. Metro/Expo читают только mobile/node_modules, поэтому этот package.json их не затрагивает.",
+  "scripts": {
+    "prepare": "lefthook install",
+    "validate:server": "cd server && npm run typecheck && npm test -- --ci --passWithNoTests",
+    "validate:mobile": "cd mobile && npm run typecheck && npm test -- --ci --passWithNoTests",
+    "validate:all": "npm run validate:server && npm run validate:mobile",
+    "compose:check": "docker compose --profile app config -q",
+    "tts:syntax": "python -c \"import ast; [ast.parse(open('tts-worker/' + f).read()) for f in ['main.py']]; print('tts-worker/*.py syntax OK')\""
+  },
+  "devDependencies": {
+    "lefthook": "^1.10.0"
+  }
+}

@@ -23,6 +23,14 @@ COPY package*.json ./
 # падает в ESM-loader по дефолту, и импорты вроде `./seed/animals`
 # (без расширения) не резолвятся (ERR_MODULE_NOT_FOUND).
 COPY tsconfig.json ./
+# TTS-кеш: создаём директорию и даём права `app` пользователю ДО USER app.
+# Без этого docker-compose мontирует named volume `ninegames-tts-cache` в
+# `/data/tts-cache` как owned by root, а наш NestJS бежит под `app` → падает
+# в TtsCacheService.onModuleInit() на попытке создать `.write-probe`. Dokploy
+# тогда показывает healthcheck failure без полезного контекста.
+# Права копируются volume'ом при первом монтировании (если volume пустой),
+# так что этого одного chown достаточно.
+RUN mkdir -p /data/tts-cache && chown -R app:app /data
 USER app
 EXPOSE 3000
 # NestJS из-за `prisma/` в tsconfig.include укладывает бандл в dist/src/.

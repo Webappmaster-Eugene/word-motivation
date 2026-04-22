@@ -1,0 +1,76 @@
+# lefthook — git-хуки для 90.games.
+#
+# Установка (один раз после клонирования):
+#   npm install
+#   npx lefthook install
+#
+# Два уровня защиты:
+#
+#   1. pre-commit (≤ 10 сек, на каждый `git commit`) — быстрые проверки:
+#      синтаксис Python, typecheck TypeScript, валидация compose, линт
+#      requirements.txt и Dockerfile.
+#
+#   2. pre-push (≤ 2 мин, на `git push`) — полные тесты и compose-config
+#      для всех 5 сервисов. Не даёт отправить на Dokploy сборку, которая
+#      сломается по тестам/типам.
+#
+# Тяжёлая проверка (docker build tts-worker, mirror Dokploy) — в CI
+# (.github/workflows/ci.yml, job `docker-build`), иначе pre-push занимал бы
+# 10+ минут на каждый push.
+#
+# Обойти хук разово (НЕ ЗЛОУПОТРЕБЛЯТЬ):
+#   LEFTHOOK=0 git commit -m "..."
+#   или: git commit --no-verify -m "..."
+
+colors: true
+
+pre-commit:
+  parallel: true
+  commands:
+    # Python syntax для изменённых .py (ловит опечатки, отступы).
+    python-syntax:
+      glob: "tts-worker/**/*.py"
+      run: python -m py_compile {staged_files}
+
+    # requirements.txt: inline-флаги (баг 22-04-2026 `torch==...+cpu --extra-index-url`).
+    requirements-lint:
+      glob: "tts-worker/requirements.txt"
+      run: python scripts/check-requirements-txt.py {staged_files}
+
+    # Dockerfile: блок `:latest` — недетерминированные билды.
+    dockerfile-lint:
+      glob: "**/Dockerfile*"
+      run: python scripts/check-dockerfile.py {staged_files}
+
+    # TypeScript: server. Полный tsc --noEmit — быстрее инкрементального на проекте этого размера.
+    server-typecheck:
+      glob: "server/**/*.ts"
+      root: "server"
+      run: npm run typecheck
+
+    # TypeScript: mobile.
+    mobile-typecheck:
+      glob: "mobile/**/*.{ts,tsx}"
+      root: "mobile"
+      run: npm run typecheck
+
+    # docker-compose config — валидация YAML + ссылок (volumes, networks,
+    # depends_on, healthcheck). Профиль app обязателен, иначе server/web/
+    # tts-worker не видны компоузу.
+    compose-config:
+      glob: "docker-compose*.yml"
+      run: docker compose --profile app config -q
+
+pre-push:
+  parallel: false
+  commands:
+    server-full:
+      root: "server"
+      run: npm run typecheck && npm test -- --ci --passWithNoTests && npm run build
+
+    mobile-full:
+      root: "mobile"
+      run: npm run typecheck && npm test -- --ci --passWithNoTests
+
+    compose-full:
+      run: docker compose --profile app config -q

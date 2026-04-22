@@ -51,6 +51,14 @@ export class TtsCacheService implements OnModuleInit {
   private readonly cacheDir: string;
   private readonly maxBytes: number;
   private readonly inFlight = new Map<string, Promise<CachedEntry>>();
+  /**
+   * `false` если директория кеша недоступна (нет прав / volume не смонтирован /
+   * диск полный). В этом режиме `lookup`/`store` ведут себя как no-op — клиенты
+   * получают всегда cache-miss, синтез идёт каждый раз. Это graceful fallback,
+   * чтобы сервер запускался даже при misconfig (например, volume owned by root
+   * в non-root контейнере — ровно тот кейс что сломал Dokploy 22-04-2026).
+   */
+  private usable = false;
 
   constructor(
     private readonly config: ConfigService<AppConfig, true>,
@@ -61,21 +69,35 @@ export class TtsCacheService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
-    await fs.mkdir(this.cacheDir, { recursive: true });
-    // Валидируем, что директория записываема — иначе лучше узнать при старте,
-    // чем на первом синтез-запросе.
-    const probe = path.join(this.cacheDir, '.write-probe');
+    // Если TTS глобально выключен — не трогаем файловую систему.
+    // Стартуем сервер даже на read-only / misconfigured volume'ах.
+    const ttsEnabled = this.config.get('TTS_ENABLED', { infer: true });
+    if (!ttsEnabled) {
+      this.logger.warn('TTS отключён (TTS_ENABLED=false), кеш не инициализируется');
+      return;
+    }
+
     try {
+      await fs.mkdir(this.cacheDir, { recursive: true });
+      const probe = path.join(this.cacheDir, '.write-probe');
       await fs.writeFile(probe, '');
       await fs.unlink(probe);
+      this.usable = true;
+      this.logger.log(`TTS-кеш: ${this.cacheDir} (лимит ${this.maxBytes / 1024 / 1024} МБ)`);
     } catch (err) {
-      throw new Error(
-        `Не удалось писать в TTS_CACHE_DIR=${this.cacheDir}: ${
+      // Не бросаем — бут должен пройти. Логируем громко, чтобы заметили в логах.
+      this.logger.error(
+        `TTS-кеш недоступен (${this.cacheDir}): ${
           err instanceof Error ? err.message : String(err)
-        }`,
+        }. Синтез будет работать без кеша (каждый запрос = новый вызов Silero).`,
       );
+      this.usable = false;
     }
-    this.logger.log(`TTS-кеш: ${this.cacheDir} (лимит ${this.maxBytes / 1024 / 1024} МБ)`);
+  }
+
+  /** true — если директория успешно проверена при старте и готова к записи. */
+  isUsable(): boolean {
+    return this.usable;
   }
 
   hashKey(input: CacheKeyInput): string {
@@ -85,8 +107,10 @@ export class TtsCacheService implements OnModuleInit {
 
   /**
    * Ищет файл в кеше. Быстро: один `stat`.
+   * Если кеш помечен как unusable — всегда возвращаем null (клиент пойдёт на синтез).
    */
   async lookup(hash: string): Promise<CachedEntry | null> {
+    if (!this.usable) return null;
     const absolutePath = this.absolutePathFor(hash);
     try {
       const st = await fs.stat(absolutePath);
@@ -111,9 +135,22 @@ export class TtsCacheService implements OnModuleInit {
   /**
    * Атомарно сохраняет WAV в кеш. Пишем в временный файл + rename — чтобы
    * параллельный `lookup` не увидел полу-записанный файл.
+   *
+   * Если кеш unusable — возвращаем entry, указывающий в несуществующий путь.
+   * Клиентский `/tts/audio/{hash}.wav` вернёт 404, но сам синтез-запрос
+   * не упадёт. Это не идеально (повторный POST снова синтезирует), но лучше,
+   * чем 500 при misconfigured volume.
    */
   async store(hash: string, audio: Buffer): Promise<CachedEntry> {
     const absolutePath = this.absolutePathFor(hash);
+    if (!this.usable) {
+      return {
+        hash,
+        absolutePath,
+        publicPath: this.publicPathFor(hash),
+        sizeBytes: audio.length,
+      };
+    }
     const tmpPath = `${absolutePath}.tmp-${process.pid}-${Date.now()}`;
     await fs.writeFile(tmpPath, audio);
     await fs.rename(tmpPath, absolutePath);

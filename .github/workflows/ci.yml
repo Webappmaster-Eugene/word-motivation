@@ -76,3 +76,85 @@ jobs:
         run: npm test -- --ci --passWithNoTests
       - name: Build
         run: npm run build
+
+  # Быстрые проверки на самом проекте (≤ 1 мин): Python syntax,
+  # requirements.txt lint, Dockerfile lint. Ловит класс багов которые
+  # другие job не видят: опечатки в Python-коде sidecar'а, inline-флаги
+  # в requirements.txt (Dokploy fail 22-04-2026), `:latest` в Dockerfile.
+  static-checks:
+    name: Static (Python / requirements.txt / Dockerfile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Python syntax
+        run: python -m py_compile tts-worker/main.py
+      - name: requirements.txt lint
+        run: python scripts/check-requirements-txt.py tts-worker/requirements.txt
+      - name: Dockerfile lint
+        run: python scripts/check-dockerfile.py server/Dockerfile mobile/Dockerfile.web tts-worker/Dockerfile
+
+  # MIRROR Dokploy-сборки: собираем все 3 docker image'а ровно так же, как это
+  # сделает Dokploy. Эта job ловит ВСЕ проблемы уровня контейнеризации:
+  #  * невалидный requirements.txt (торч 22-04-2026 не собрался бы)
+  #  * ошибки Dockerfile (COPY, RUN, WORKDIR)
+  #  * несовместимость зависимостей (npm, pip)
+  #  * подгрузку образов с Docker Hub
+  # Если эта job зелёная — Dokploy-билд пройдёт с вероятностью > 99%.
+  #
+  # Тяжеловесно (8–15 мин из-за скачивания torch ~200 МБ и npm-install
+  # в web/server). Кешируем buildx layers, чтобы повторные прогоны были
+  # быстрее (2–3 мин).
+  docker-build:
+    name: Docker build (mirror Dokploy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Каждый образ собираем отдельно — если tts-worker падает, мы всё равно
+      # узнаём результат server и web (ломаться могут одновременно разные
+      # сервисы по разным причинам).
+      - name: Build tts-worker
+        uses: docker/build-push-action@v6
+        with:
+          context: ./tts-worker
+          file: ./tts-worker/Dockerfile
+          push: false
+          tags: ninegames-tts-worker:ci
+          cache-from: type=gha,scope=tts-worker
+          cache-to: type=gha,scope=tts-worker,mode=max
+
+      - name: Build server
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: false
+          tags: ninegames-server:ci
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,scope=server,mode=max
+
+      - name: Build web
+        uses: docker/build-push-action@v6
+        with:
+          context: ./mobile
+          file: ./mobile/Dockerfile.web
+          push: false
+          tags: ninegames-web:ci
+          build-args: |
+            EXPO_PUBLIC_API_BASE_URL=https://api.example.com
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+      # docker compose config — финальная валидация, что compose файл корректно
+      # мёржится и все сервисы резолвятся.
+      - name: Compose config validation
+        env:
+          JWT_SECRET: ci-secret-placeholder-at-least-32-chars
+          DEVICE_ID_SALT: ci-salt-placeholder
+          POSTGRES_PASSWORD: postgres
+        run: docker compose --profile app config -q

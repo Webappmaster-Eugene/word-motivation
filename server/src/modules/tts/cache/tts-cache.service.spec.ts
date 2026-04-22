@@ -7,11 +7,12 @@ import { Test } from '@nestjs/testing';
 
 import { TtsCacheService } from './tts-cache.service';
 
-function mockConfig(overrides: Partial<{ dir: string; limitMb: number }>) {
+function mockConfig(overrides: Partial<{ dir: string; limitMb: number; enabled: boolean }>) {
   return {
     get: (key: string) => {
       if (key === 'TTS_CACHE_DIR') return overrides.dir ?? '/tmp/tts-nonexistent';
       if (key === 'TTS_MAX_CACHE_MB') return overrides.limitMb ?? 1;
+      if (key === 'TTS_ENABLED') return overrides.enabled ?? true;
       throw new Error(`mockConfig: неизвестный ключ ${key}`);
     },
   } as unknown as ConfigService;
@@ -103,6 +104,33 @@ describe('TtsCacheService', () => {
     expect(producerCalls).toBe(1);
     expect(a.hash).toBe(b.hash);
     expect(b.hash).toBe(c.hash);
+  });
+
+  it('gracefully работает при unusable директории (нет прав, RO FS)', async () => {
+    // Используем реальную директорию, на которую не должно быть прав
+    // (root-only). На Windows проверяем через нереальный путь Null-device.
+    const impossible = process.platform === 'win32' ? 'NUL:\\cache' : '/proc/1/root/cache';
+    const svc = await build(impossible);
+    // onModuleInit НЕ должен бросить
+    expect(svc.isUsable()).toBe(false);
+    const hash = svc.hashKey({ text: 'x', voice: 'xenia', rate: 1 });
+    // lookup возвращает null — клиент пойдёт на синтез
+    expect(await svc.lookup(hash)).toBeNull();
+    // store возвращает entry (для формирования URL), но не пишет на диск
+    const entry = await svc.store(hash, Buffer.alloc(10));
+    expect(entry.hash).toBe(hash);
+  });
+
+  it('TTS_ENABLED=false — кеш не инициализируется, но сервис не падает', async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        TtsCacheService,
+        { provide: ConfigService, useValue: mockConfig({ dir: tmpDir, enabled: false }) },
+      ],
+    }).compile();
+    const svc = module.get(TtsCacheService);
+    await svc.onModuleInit();
+    expect(svc.isUsable()).toBe(false);
   });
 
   it('эвикция по размеру сносит самые старые файлы', async () => {
