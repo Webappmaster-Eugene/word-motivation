@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useService } from '@/services/di/provider';
 import type { AlphabetContent } from '@/services/content-repo/types';
+import { navigateHome } from '@/shared/ui/nav';
 import { theme } from '@/shared/theme';
 
 import { ActionBar } from './components/action-bar';
@@ -121,9 +122,16 @@ export function AlphabetGame({
 
   // В idle ещё нечего терять — выходим сразу. Иначе подтверждаем, чтобы
   // случайный тап по «Домой» не прервал середину слова/сцены.
+  // На web обычный Alert не рендерится — используем нативный confirm как fallback.
   const goHome = () => {
     if (state.matches('idle')) {
-      router.back();
+      navigateHome(router);
+      return;
+    }
+    if (Platform.OS === 'web') {
+      const g = globalThis as unknown as { confirm?: (m: string) => boolean };
+      const ok = g.confirm?.('Выйти из игры? Прогресс сохранится.') ?? true;
+      if (ok) navigateHome(router);
       return;
     }
     Alert.alert(
@@ -131,7 +139,7 @@ export function AlphabetGame({
       'Прогресс сохранится, ты сможешь продолжить в любой момент.',
       [
         { text: 'Остаться', style: 'cancel' },
-        { text: 'Выйти', style: 'destructive', onPress: () => router.back() },
+        { text: 'Выйти', style: 'destructive', onPress: () => navigateHome(router) },
       ],
       { cancelable: true },
     );

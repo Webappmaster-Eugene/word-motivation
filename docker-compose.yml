@@ -68,6 +68,36 @@ services:
     networks:
       - ninegames
 
+  tts-worker:
+    build:
+      context: tts-worker
+      dockerfile: Dockerfile
+    image: ninegames-tts-worker:${IMAGE_TAG:-latest}
+    container_name: ninegames-tts-worker
+    restart: unless-stopped
+    profiles: ["app"]
+    environment:
+      TTS_LOG_LEVEL: ${TTS_LOG_LEVEL:-INFO}
+      TTS_TORCH_THREADS: ${TTS_TORCH_THREADS:-4}
+    volumes:
+      # Persistent том: скачанная модель Silero сохраняется между рестартами.
+      # Первый старт скачивает ~60 МБ с models.silero.ai; на Dokploy volume
+      # переживёт rebuild server-контейнера.
+      - ninegames-tts-models:/models
+    # Внутренний сервис — наружу НЕ выставляем, только docker-network.
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3).read()"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      # Первый старт качает и распаковывает ~60 МБ модели и прогревает
+      # torch — порядок 20–40 сек. Даём с запасом.
+      start_period: 90s
+    networks:
+      - ninegames
+
   server:
     build:
       context: server
@@ -92,11 +122,29 @@ services:
       DEVICE_ID_SALT: ${DEVICE_ID_SALT}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
+      TTS_ENABLED: ${TTS_ENABLED:-true}
+      TTS_WORKER_URL: ${TTS_WORKER_URL:-http://tts-worker:5000}
+      TTS_CACHE_DIR: /data/tts-cache
+      TTS_MAX_CACHE_MB: ${TTS_MAX_CACHE_MB:-512}
+      TTS_DEFAULT_VOICE: ${TTS_DEFAULT_VOICE:-xenia}
+      TTS_REQUEST_TIMEOUT_MS: ${TTS_REQUEST_TIMEOUT_MS:-15000}
+      TTS_RATE_LIMIT_PER_MIN: ${TTS_RATE_LIMIT_PER_MIN:-60}
+    volumes:
+      # Persistent кеш синтезированных WAV. Живёт до ручного сброса или эвикции
+      # по размеру (TTS_MAX_CACHE_MB). На Dokploy — обычный docker volume,
+      # не требует настроек.
+      - ninegames-tts-cache:/data/tts-cache
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # tts-worker специально без `service_healthy` — если он упал (OOM, нет
+      # сети для скачивания модели), сервер всё равно должен стартовать и
+      # отдавать 503 из `/tts/*`, на что мобильный клиент автоматически упадёт
+      # на expo-speech. Иначе отказ sidecar'а парализует всё приложение.
+      tts-worker:
+        condition: service_started
     # Host-порт пробрасывает только docker-compose.override.yml (локальный dev).
     # В prod доступ — через Dokploy Traefik (Domains в UI приложения),
     # Traefik ходит внутри compose-сети по имени `server:3000`.
@@ -154,6 +202,8 @@ services:
 volumes:
   ninegames-postgres-data:
   ninegames-redis-data:
+  ninegames-tts-models:
+  ninegames-tts-cache:
 
 networks:
   ninegames:

@@ -94,6 +94,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     extra: {
       apiBaseUrl:
         process.env.EXPO_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? 'http://10.0.2.2:3000',
+      ttsMode: process.env.EXPO_PUBLIC_TTS_MODE ?? 'server',
       eas: {
         projectId,
       },

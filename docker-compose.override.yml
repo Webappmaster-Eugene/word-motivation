@@ -23,6 +23,13 @@ services:
     ports:
       - "${SERVER_PORT:-3000}:3000"
 
+  tts-worker:
+    # В dev пробрасываем наружу, чтобы можно было дёрнуть `curl localhost:5000/health`
+    # или прогреть модель скриптом. В prod (docker-compose.yml без override) —
+    # только internal сеть.
+    ports:
+      - "${TTS_WORKER_PORT:-5005}:5000"
+
   web:
     ports:
       - "${WEB_PORT:-8080}:80"

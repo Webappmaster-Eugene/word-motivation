@@ -3,6 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BIOME_RU } from '@/games/alphabet/content/types';
+import { navigateHome } from '@/shared/ui/nav';
 import { theme } from '@/shared/theme';
 
 import { AnimalTile } from './components/animal-tile';
@@ -22,7 +23,12 @@ export default function ZooScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="На главную"
+          onPress={() => navigateHome(router)}
+          style={styles.back}
+        >
           <Text style={styles.backText}>← Домой</Text>
         </Pressable>
         <Text style={styles.title}>Зоопарк</Text>

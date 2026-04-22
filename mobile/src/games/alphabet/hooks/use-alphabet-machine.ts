@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 
 import { useService } from '@/services/di/provider';
 import type { AlphabetContent } from '@/services/content-repo/types';
+import { SPEECH_PRESETS } from '@/services/speech-synthesis/types';
 
 import type { AnimalInfo, WordEntry } from '../content/types';
 import { ANIMALS as FALLBACK_ANIMALS } from '../content/words';
@@ -79,41 +80,59 @@ export function useAlphabetMachine({
     const value = state.value;
     let cancelled = false;
 
-    const speakAndAdvance = async (phrase: string, minMs: number, nextEvent: Parameters<typeof send>[0] | null) => {
+    const speakAndAdvance = async (
+      phrase: string,
+      minMs: number,
+      nextEvent: Parameters<typeof send>[0] | null,
+      preset: (typeof SPEECH_PRESETS)[keyof typeof SPEECH_PRESETS] = SPEECH_PRESETS.word,
+    ) => {
       const minTimer = new Promise<void>((resolve) => setTimeout(resolve, minMs));
-      await Promise.all([tts.speak(phrase), minTimer]);
+      await Promise.all([tts.speak(phrase, preset), minTimer]);
       if (!cancelled && nextEvent) send(nextEvent);
     };
 
     if (value === 'idle') {
       // Приветствие при входе в игру: ребёнок, который ещё не читает,
       // должен услышать, что делать.
-      void tts.speak('Привет! Готов учить буквы? Нажми на большую кнопку «Начать».');
+      void tts.speak(
+        'Привет! Готов учить буквы? Нажми на большую кнопку «Начать».',
+        SPEECH_PRESETS.systemMessage,
+      );
     } else if (value === 'showLetter' && letter) {
-      const phrase =
-        state.context.mode === 'letter_inside_word'
-          ? `В слове ${word.word} спряталась буква ${letter.toUpperCase()}. Давай прочитаем слово.`
-          : `Буква ${letter.toUpperCase()}.`;
-      void speakAndAdvance(phrase, MIN_DISPLAY_MS.letter, { type: 'LETTER_SHOWN' });
+      if (state.context.mode === 'letter_inside_word') {
+        const phrase = `В слове ${word.word} спряталась буква ${letter.toUpperCase()}. Давай прочитаем слово.`;
+        void speakAndAdvance(phrase, MIN_DISPLAY_MS.letter, { type: 'LETTER_SHOWN' }, SPEECH_PRESETS.word);
+      } else {
+        // Для отдельной буквы — медленнее и с паузой, чтобы ребёнок расслышал.
+        const phrase = `Буква ${letter.toUpperCase()}.`;
+        void speakAndAdvance(phrase, MIN_DISPLAY_MS.letter, { type: 'LETTER_SHOWN' }, SPEECH_PRESETS.letter);
+      }
     } else if (value === 'showWord') {
       void speakAndAdvance(
         `Прочитай слово: ${word.word}.`,
         MIN_DISPLAY_MS.letter,
         { type: 'LETTER_SHOWN' },
+        SPEECH_PRESETS.word,
       );
     } else if (value === 'hintLetter' && letter) {
       const hint = word.letterHints[letter] ?? `Это буква ${letter.toUpperCase()}.`;
-      void tts.speak(hint);
+      void tts.speak(hint, SPEECH_PRESETS.hint);
     } else if (value === 'hintWord') {
-      void tts.speak(`Скажи слово ${word.word}.`);
+      void tts.speak(`Скажи слово ${word.word}.`, SPEECH_PRESETS.hint);
     } else if (value === 'revealAnimal' && animal) {
       void speakAndAdvance(
         `${animal.title}! ${animal.greeting}`,
         MIN_DISPLAY_MS.scene,
         { type: 'SCENE_READY' },
+        SPEECH_PRESETS.animalReply,
       );
     } else if (value === 'done') {
-      void speakAndAdvance('Молодец!', MIN_DISPLAY_MS.done, { type: 'START' });
+      void speakAndAdvance(
+        'Молодец!',
+        MIN_DISPLAY_MS.done,
+        { type: 'START' },
+        SPEECH_PRESETS.animalReply,
+      );
     }
 
     return () => {

@@ -1,7 +1,8 @@
 import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { navigateHome } from '@/shared/ui/nav';
 import { theme } from '@/shared/theme';
 
 interface Credit {
@@ -68,30 +69,68 @@ const CREDITS: readonly Credit[] = [
   },
 ];
 
+const AUTHOR_URL = 'https://nadtocheev.ru';
+
+function openLink(url: string): void {
+  void Linking.openURL(url).catch(() => {
+    /* на web Linking.openURL работает через window.open; любая ошибка — проглатываем */
+  });
+}
+
 export function AboutScreen() {
   const router = useRouter();
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Назад"
+          onPress={() => (router.canGoBack() ? router.back() : navigateHome(router))}
+          style={styles.back}
+        >
           <Text style={styles.backText}>← Назад</Text>
         </Pressable>
         <Text style={styles.title}>О приложении</Text>
         <View style={styles.back} />
       </View>
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        <View style={styles.authorCard}>
+          <Text style={styles.authorLabel}>АВТОР</Text>
+          <Text style={styles.authorName}>Иван Надточеев</Text>
+          <Text style={styles.authorBio}>
+            Создаю обучающие игры и инструменты для детей и взрослых. Если нашли баг
+            или хотите предложить новую игру — пишите.
+          </Text>
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel={`Перейти на ${AUTHOR_URL}`}
+            onPress={() => openLink(AUTHOR_URL)}
+            style={({ pressed }) => [styles.authorLink, pressed && styles.authorLinkPressed]}
+          >
+            <Text style={styles.authorLinkText}>nadtocheev.ru →</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.sectionHeading}>Благодарности</Text>
         <Text style={styles.intro}>
           90.games — открытый учебный проект, использующий свободные библиотеки и ассеты.
           Благодарим авторов ниже за их труд.
         </Text>
         {CREDITS.map((c) => (
-          <View key={c.title} style={styles.credit}>
+          <Pressable
+            key={c.title}
+            accessibilityRole={c.url ? 'link' : undefined}
+            accessibilityLabel={c.url ? `${c.title}. Открыть ${c.url}` : c.title}
+            disabled={!c.url}
+            onPress={c.url ? () => openLink(c.url!) : undefined}
+            style={({ pressed }) => [styles.credit, pressed && c.url && styles.creditPressed]}
+          >
             <Text style={styles.creditTitle}>{c.title}</Text>
             <Text style={styles.creditMeta}>
               {c.author} · {c.license}
             </Text>
             {c.url ? <Text style={styles.creditUrl}>{c.url}</Text> : null}
-          </View>
+          </Pressable>
         ))}
       </ScrollView>
     </SafeAreaView>
@@ -127,6 +166,62 @@ const styles = StyleSheet.create({
   scroll: {
     padding: theme.spacing.lg,
     gap: theme.spacing.md,
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  authorCard: {
+    padding: theme.spacing.lg,
+    borderRadius: theme.radii.lg,
+    backgroundColor: theme.colors.surface,
+    gap: theme.spacing.xs,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: theme.spacing.md,
+  },
+  authorLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.textMuted,
+    letterSpacing: 0.8,
+  },
+  authorName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: theme.colors.text,
+  },
+  authorBio: {
+    fontSize: 15,
+    color: theme.colors.text,
+    lineHeight: 22,
+    marginTop: theme.spacing.xs,
+  },
+  authorLink: {
+    alignSelf: 'flex-start',
+    marginTop: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radii.full,
+    backgroundColor: theme.colors.accent,
+  },
+  authorLinkPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.98 }],
+  },
+  authorLinkText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  sectionHeading: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: theme.colors.text,
+    marginTop: theme.spacing.md,
+    marginBottom: theme.spacing.xs,
   },
   intro: {
     fontSize: 15,
@@ -144,6 +239,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 2,
     elevation: 1,
+  },
+  creditPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.995 }],
   },
   creditTitle: {
     fontSize: 16,

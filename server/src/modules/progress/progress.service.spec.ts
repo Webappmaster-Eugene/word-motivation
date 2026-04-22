@@ -11,24 +11,33 @@ describe('ProgressService', () => {
     findUnique: jest.Mock;
     create: jest.Mock;
     update: jest.Mock;
+    findMany: jest.Mock;
+    deleteMany: jest.Mock;
   };
-  let attempt: { create: jest.Mock };
-  let unlocked: { upsert: jest.Mock; findMany: jest.Mock };
+  let attempt: { create: jest.Mock; deleteMany: jest.Mock };
+  let unlocked: { upsert: jest.Mock; findMany: jest.Mock; deleteMany: jest.Mock };
+  let $transaction: jest.Mock;
 
   beforeEach(async () => {
     session = {
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      findMany: jest.fn(),
+      deleteMany: jest.fn(),
     };
-    attempt = { create: jest.fn() };
-    unlocked = { upsert: jest.fn(), findMany: jest.fn() };
+    attempt = { create: jest.fn(), deleteMany: jest.fn() };
+    unlocked = { upsert: jest.fn(), findMany: jest.fn(), deleteMany: jest.fn() };
+    // transaction-обёртка пробрасывает тот же мок-клиент в callback
+    $transaction = jest.fn((fn: (tx: unknown) => Promise<unknown>) =>
+      fn({ session, attempt, unlockedAnimal: unlocked }),
+    );
     const module = await Test.createTestingModule({
       providers: [
         ProgressService,
         {
           provide: PrismaService,
-          useValue: { session, attempt, unlockedAnimal: unlocked },
+          useValue: { session, attempt, unlockedAnimal: unlocked, $transaction },
         },
       ],
     }).compile();
@@ -109,6 +118,40 @@ describe('ProgressService', () => {
     expect(unlocked.findMany).toHaveBeenCalledWith({
       where: { childId: 'c1' },
       orderBy: { unlockedAt: 'desc' },
+    });
+  });
+
+  describe('resetProgress', () => {
+    it('сносит сессии, попытки и открытых животных в транзакции', async () => {
+      session.findMany.mockResolvedValueOnce([{ id: 's1' }, { id: 's2' }]);
+      attempt.deleteMany.mockResolvedValueOnce({ count: 4 });
+      session.deleteMany.mockResolvedValueOnce({ count: 2 });
+      unlocked.deleteMany.mockResolvedValueOnce({ count: 3 });
+
+      const result = await service.resetProgress('c1');
+
+      expect($transaction).toHaveBeenCalledTimes(1);
+      expect(session.findMany).toHaveBeenCalledWith({
+        where: { childId: 'c1' },
+        select: { id: true },
+      });
+      expect(attempt.deleteMany).toHaveBeenCalledWith({
+        where: { sessionId: { in: ['s1', 's2'] } },
+      });
+      expect(session.deleteMany).toHaveBeenCalledWith({ where: { id: { in: ['s1', 's2'] } } });
+      expect(unlocked.deleteMany).toHaveBeenCalledWith({ where: { childId: 'c1' } });
+      expect(result).toEqual({ unlockedAnimals: 3, sessions: 2, attempts: 4 });
+    });
+
+    it('корректно обрабатывает ребёнка без истории сессий', async () => {
+      session.findMany.mockResolvedValueOnce([]);
+      unlocked.deleteMany.mockResolvedValueOnce({ count: 0 });
+
+      const result = await service.resetProgress('c1');
+
+      expect(attempt.deleteMany).not.toHaveBeenCalled();
+      expect(session.deleteMany).not.toHaveBeenCalled();
+      expect(result).toEqual({ unlockedAnimals: 0, sessions: 0, attempts: 0 });
     });
   });
 });

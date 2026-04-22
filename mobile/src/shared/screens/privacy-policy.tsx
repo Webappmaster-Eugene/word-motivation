@@ -1,10 +1,6 @@
-import { useRouter } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { LegalPage, type LegalSection } from './legal-page';
 
-import { theme } from '@/shared/theme';
-
-const SECTIONS: ReadonlyArray<{ readonly title: string; readonly body: string }> = [
+const SECTIONS: readonly LegalSection[] = [
   {
     title: 'Что мы делаем и чего не делаем',
     body:
@@ -45,9 +41,9 @@ const SECTIONS: ReadonlyArray<{ readonly title: string; readonly body: string }>
   {
     title: 'Сброс данных',
     body:
-      'В разделе «Настройки» → «Сбросить прогресс» можно удалить локальные данные о буквах ' +
-      'и открытых животных. Идентификатор устройства также удаляется — при следующем запуске ' +
-      'будет создан новый.',
+      'В разделе «Настройки» → «Сбросить весь прогресс» можно удалить локальные и серверные ' +
+      'данные: открытые животные, статистика по буквам, сохранённые сессии. Идентификатор ' +
+      'устройства также удаляется — при следующем запуске будет создан новый.',
   },
   {
     title: 'Кому мы передаём данные',
@@ -55,6 +51,13 @@ const SECTIONS: ReadonlyArray<{ readonly title: string; readonly body: string }>
       'Никому из рекламных сетей или аналитики. Единственный внешний сервис — OpenRouter ' +
       '(для ответов ИИ) — и туда передаётся только текст сообщения и роль говорящего. ' +
       'Ключ API хранится только на нашем сервере, ни в коем случае не в мобильном бандле.',
+  },
+  {
+    title: 'Ваши права',
+    body:
+      'Вы вправе запросить экспорт или удаление данных, привязанных к идентификатору ' +
+      'устройства. Поскольку мы не знаем, чьё это устройство, единственный способ подтверждения — ' +
+      'сам идентификатор. Запрос направляйте на support@90.games.',
   },
   {
     title: 'Контакт',
@@ -66,75 +69,11 @@ const SECTIONS: ReadonlyArray<{ readonly title: string; readonly body: string }>
 ];
 
 export function PrivacyPolicyScreen() {
-  const router = useRouter();
   return (
-    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
-          <Text style={styles.backText}>← Назад</Text>
-        </Pressable>
-        <Text style={styles.title}>Конфиденциальность</Text>
-        <View style={styles.back} />
-      </View>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <Text style={styles.lastUpdated}>Последнее обновление: 19 апреля 2026 г.</Text>
-        {SECTIONS.map((s) => (
-          <View key={s.title} style={styles.section}>
-            <Text style={styles.sectionTitle}>{s.title}</Text>
-            <Text style={styles.sectionBody}>{s.body}</Text>
-          </View>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
+    <LegalPage
+      title="Конфиденциальность"
+      lastUpdated="21 апреля 2026 г."
+      sections={SECTIONS}
+    />
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.md,
-  },
-  back: {
-    minWidth: 80,
-    paddingVertical: theme.spacing.sm,
-  },
-  backText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.accent,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  scroll: {
-    padding: theme.spacing.lg,
-    gap: theme.spacing.lg,
-  },
-  lastUpdated: {
-    fontSize: 13,
-    color: theme.colors.textMuted,
-    fontStyle: 'italic',
-  },
-  section: {
-    gap: theme.spacing.xs,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  sectionBody: {
-    fontSize: 16,
-    color: theme.colors.text,
-    lineHeight: 24,
-  },
-});

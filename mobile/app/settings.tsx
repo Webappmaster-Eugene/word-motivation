@@ -6,6 +6,7 @@ import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useService } from '@/services/di/provider';
+import { navigateHome } from '@/shared/ui/nav';
 import { theme } from '@/shared/theme';
 
 function appVersion(): string {
@@ -18,19 +19,46 @@ function webConfirm(message: string): boolean {
   return g.confirm?.(message) ?? false;
 }
 
+function webAlert(message: string): void {
+  if (Platform.OS !== 'web') return;
+  const g = globalThis as unknown as { alert?: (m: string) => void };
+  g.alert?.(message);
+}
+
 export default function SettingsScreen() {
   const router = useRouter();
   const mastery = useService('letterMastery');
   const localUnlocked = useService('localUnlocked');
+  const progressApi = useService('progressApi');
   const queryClient = useQueryClient();
   const [resetting, setResetting] = useState(false);
 
   const doReset = async () => {
     setResetting(true);
     try {
+      // 1. Локальные данные — без сети, всегда успешно.
       await Promise.all([mastery.reset(), localUnlocked.reset()]);
-      void queryClient.invalidateQueries();
-      if (Platform.OS !== 'web') {
+
+      // 2. Серверный сброс — главный фикс: без него `listUnlocked()` продолжал
+      // возвращать открытых животных из БД, и зоопарк снова наполнялся ими.
+      // Ошибку съедаем: если сервер недоступен (оффлайн), хотя бы локально чисто.
+      try {
+        await progressApi.resetProgress();
+      } catch (err) {
+        if (__DEV__) {
+          // eslint-disable-next-line no-console
+          console.warn('Серверный сброс прогресса недоступен:', err);
+        }
+      }
+
+      // 3. Инвалидация cache — без неё react-query отдаст устаревший snapshot
+      // зоопарка до следующего focus. `refetchType: 'active'` заставляет
+      // активные экраны (zoo, hub) перезапросить немедленно.
+      await queryClient.invalidateQueries({ refetchType: 'active' });
+
+      if (Platform.OS === 'web') {
+        webAlert('Готово: прогресс сброшен.');
+      } else {
         Alert.alert('Готово', 'Прогресс сброшен.');
       }
     } finally {
@@ -40,7 +68,7 @@ export default function SettingsScreen() {
 
   const confirmReset = () => {
     const message =
-      'Сбросить прогресс: открытые животные в зоопарке исчезнут, статистика по буквам обнулится.';
+      'Сбросить весь прогресс: открытые животные в зоопарке исчезнут, статистика по буквам обнулится, все сохранённые сессии будут удалены.';
     if (Platform.OS === 'web') {
       if (webConfirm(message)) void doReset();
       return;
@@ -54,7 +82,12 @@ export default function SettingsScreen() {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="На главную"
+          onPress={() => navigateHome(router)}
+          style={styles.back}
+        >
           <Text style={styles.backText}>← Домой</Text>
         </Pressable>
         <Text style={styles.title}>Настройки</Text>
@@ -63,19 +96,31 @@ export default function SettingsScreen() {
       <ScrollView contentContainerStyle={styles.scroll}>
         <Section title="Данные">
           <RowButton
-            label={resetting ? 'Сбрасываем…' : 'Сбросить прогресс по буквам'}
+            label={resetting ? 'Сбрасываем…' : 'Сбросить весь прогресс'}
             onPress={confirmReset}
             disabled={resetting}
             danger
           />
         </Section>
 
-        <Section title="Информация">
+        <Section title="Правовая информация">
           <Link href="/privacy" asChild>
-            <RowButton label="Конфиденциальность" chevron />
+            <RowButton label="Политика конфиденциальности" chevron />
           </Link>
+          <Link href="/terms" asChild>
+            <RowButton label="Условия использования" chevron />
+          </Link>
+          <Link href="/offer" asChild>
+            <RowButton label="Публичная оферта" chevron />
+          </Link>
+          <Link href="/contacts" asChild>
+            <RowButton label="Контакты" chevron />
+          </Link>
+        </Section>
+
+        <Section title="О проекте">
           <Link href="/about" asChild>
-            <RowButton label="Благодарности авторам" chevron />
+            <RowButton label="Об авторе и библиотеках" chevron />
           </Link>
         </Section>
 

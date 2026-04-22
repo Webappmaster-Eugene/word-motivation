@@ -1,0 +1,13 @@
+# Silero v4_ru — основная модель. Распространяется автором через torch.hub,
+# скачивается при старте, весит ~60 МБ.
+#
+# torch: CPU-only wheel. ЯВНО задаём 2.4 чтобы не тянуть gigabyte GPU-зависимостей.
+# Для Silero v4 2.x — рабочая ветка (модель упакована через torch.package,
+# совместима с 2.0+).
+torch==2.4.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+numpy==1.26.4
+
+# FastAPI + uvicorn — HTTP-обёртка.
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.10.3

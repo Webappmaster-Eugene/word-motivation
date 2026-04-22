@@ -1,7 +1,16 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AnimalScene } from '@/games/alphabet/components/animal-scene';
@@ -12,7 +21,10 @@ import type { AnimalInfo } from '@/games/alphabet/content/types';
 import type { AnimalSceneAsset } from '@/services/animal-scene/types';
 import { useService } from '@/services/di/provider';
 import type { ChatHistoryEntry } from '@/services/llm-chat/llm-chat';
+import { SPEECH_PRESETS } from '@/services/speech-synthesis/types';
 import { sanitizeUserMessage } from '@/shared/client-moderation';
+import { contrastSecondaryColor, contrastTextColor } from '@/shared/theme/contrast';
+import { navigateHome } from '@/shared/ui/nav';
 import { theme } from '@/shared/theme';
 
 import { useZooData } from './hooks/use-zoo-data';
@@ -25,9 +37,13 @@ const QUICK_QUESTIONS: readonly string[] = [
   'Что ты любишь кушать?',
   'Где ты живёшь?',
   'Что ты умеешь?',
+  'Расскажи про себя',
 ];
 
-type ChatMessage = ChatHistoryEntry & { readonly sanitized?: boolean };
+const MAX_INPUT_LENGTH = 500;
+const MAX_HISTORY_FOR_REQUEST = 18;
+
+type ChatMessage = ChatHistoryEntry & { readonly sanitized?: boolean; readonly id: string };
 
 function triggerHaptic(type: 'light' | 'success' | 'warning' = 'light'): void {
   if (Platform.OS === 'web') return;
@@ -45,17 +61,15 @@ function triggerHaptic(type: 'light' | 'success' | 'warning' = 'light'): void {
 }
 
 /**
- * Готовит историю для отправки на сервер: отбрасывает санитизированные
- * user-сообщения и следующий за ними ассистентский ответ (это был scripted
- * fallback на мат — не релевантен для LLM-контекста). Также приводит тип
- * к `ChatHistoryEntry` без служебного поля `sanitized`.
+ * Отбрасывает санитизированные user-сообщения и следующий за ними ассистентский
+ * ответ — это были scripted fallback-реплики на мат, не связанные с реальным
+ * диалогом. Так LLM не путается в контексте.
  */
 function buildCleanHistory(messages: readonly ChatMessage[]): ChatHistoryEntry[] {
   const out: ChatHistoryEntry[] = [];
   for (let i = 0; i < messages.length; i += 1) {
     const m = messages[i]!;
     if (m.sanitized) {
-      // Пропускаем этот user и следующий assistant (если он есть).
       const next = messages[i + 1];
       if (next && next.role === 'assistant') i += 1;
       continue;
@@ -65,6 +79,26 @@ function buildCleanHistory(messages: readonly ChatMessage[]): ChatHistoryEntry[]
   return out;
 }
 
+let msgIdCounter = 0;
+function nextMessageId(): string {
+  msgIdCounter += 1;
+  return `m${msgIdCounter}`;
+}
+
+/**
+ * Экран-чат с животным. Архитектура:
+ *
+ *  - Hero-баннер вверху: сцена с животным + кнопка «назад» + индикатор «онлайн».
+ *    Фон баннера — цвет животного, с динамическим контрастом текста.
+ *  - Список сообщений — как в мессенджере: bubble слева от животного, справа от
+ *    ребёнка, с хвостиками (borderRadius асимметрия).
+ *  - Панель быстрых вопросов — скроллится горизонтально (помещает 4–5 чипов
+ *    даже на узком экране 320px).
+ *  - Input + mic-кнопка внизу, с KeyboardAvoidingView.
+ *
+ * На web контент ограничен шириной 760px: без этого чат растекался по всему
+ * монитору и выглядел сломанным.
+ */
 export function AnimalDetailScreen({ animalId }: Props) {
   const router = useRouter();
   const query = useZooData();
@@ -85,11 +119,10 @@ export function AnimalDetailScreen({ animalId }: Props) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [history, setHistory] = useState<readonly ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
+  const [input, setInput] = useState('');
   const historyRef = useRef<ChatMessage[]>([]);
   historyRef.current = [...history];
   const scrollRef = useRef<ScrollView | null>(null);
-  // Зеркалим sessionId в ref, чтобы cleanup-коллбэк useEffect с устаревшей
-  // реактивной переменной всё равно видел актуальное значение и мог закрыть сессию.
   const sessionIdRef = useRef<string | null>(null);
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -131,15 +164,19 @@ export function AnimalDetailScreen({ animalId }: Props) {
   const speakReply = useCallback(
     (text: string) => {
       if (!animal) return;
-      void tts.speak(`${animal.title}! ${text}`);
+      void tts.speak(`${animal.title}! ${text}`, SPEECH_PRESETS.animalReply);
     },
     [animal, tts],
   );
 
   useEffect(() => {
     if (!animal) return;
-    const initial: ChatMessage[] = [{ role: 'assistant', content: animal.greeting }];
-    setHistory(initial);
+    const initial: ChatMessage = {
+      id: nextMessageId(),
+      role: 'assistant',
+      content: animal.greeting,
+    };
+    setHistory([initial]);
     speakReply(animal.greeting);
   }, [animal, speakReply]);
 
@@ -147,14 +184,14 @@ export function AnimalDetailScreen({ animalId }: Props) {
     async (rawUserText: string) => {
       if (!animal || !rawUserText.trim()) return;
 
-      // Клиентская санитизация ДО добавления в bubble — если мат, подменяем на заглушку.
       const { safe, clean } = sanitizeUserMessage(rawUserText.trim());
-      const userMessage: ChatMessage = { role: 'user', content: safe, sanitized: !clean };
+      const userMessage: ChatMessage = {
+        id: nextMessageId(),
+        role: 'user',
+        content: safe,
+        sanitized: !clean,
+      };
 
-      // Сохраняем snapshot истории ДО добавления нового сообщения — его шлём серверу.
-      // Дополнительно фильтруем: отбрасываем санитизированные user-сообщения и следующий
-      // за ними ассистентский ответ (сервер тогда отдал scripted fallback-реплику,
-      // не связанную с реальным диалогом). Так LLM не путается в контексте.
       const cleanHistoryForServer = buildCleanHistory(historyRef.current);
 
       const nextHistory = [...historyRef.current, userMessage];
@@ -165,41 +202,36 @@ export function AnimalDetailScreen({ animalId }: Props) {
       const sid = sessionId;
       if (!sid) {
         setIsThinking(false);
-        // Нет сессии — оффлайн fallback: повторяем greeting
         setHistory([
           ...nextHistory,
-          { role: 'assistant', content: animal.greeting },
+          { id: nextMessageId(), role: 'assistant', content: animal.greeting },
         ]);
         speakReply(animal.greeting);
         return;
       }
 
       try {
-        // Отправляем на сервер ОРИГИНАЛЬНЫЙ текст (server сам модерирует);
-        // у себя в UI показываем только санитизированный.
         const response = await llm.reply({
           sessionId: sid,
           animalId: animal.id,
           userText: rawUserText.trim(),
-          history: cleanHistoryForServer.slice(-8),
+          history: cleanHistoryForServer.slice(-MAX_HISTORY_FOR_REQUEST),
         });
         setHistory([
           ...nextHistory,
-          { role: 'assistant', content: response.reply },
+          { id: nextMessageId(), role: 'assistant', content: response.reply },
         ]);
         speakReply(response.reply);
         triggerHaptic('success');
       } catch (err) {
         const scriptedPool = animal.scriptedReplies ?? [];
-        // Индекс ДОЛЖЕН быть целым — делим на 2 и округляем вниз, иначе
-        // arr[1.5] = undefined и в чат попадёт пустая реплика.
         const scripted =
           scriptedPool.length > 0
             ? scriptedPool[Math.floor(historyRef.current.length / 2) % scriptedPool.length]!
             : animal.greeting;
         setHistory([
           ...nextHistory,
-          { role: 'assistant', content: scripted },
+          { id: nextMessageId(), role: 'assistant', content: scripted },
         ]);
         speakReply(scripted);
         if (__DEV__) {
@@ -227,17 +259,37 @@ export function AnimalDetailScreen({ animalId }: Props) {
     }
   }, [history, isThinking]);
 
+  const handleSubmit = () => {
+    const text = input.trim();
+    if (!text || isThinking) return;
+    setInput('');
+    void sendMessage(text);
+  };
+
   if (!animal) {
+    if (query.isLoading) {
+      return (
+        <SafeAreaView style={styles.container}>
+          <View style={styles.center}>
+            <Text style={styles.loadingText}>Открываем вольер…</Text>
+          </View>
+        </SafeAreaView>
+      );
+    }
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.center}>
-          <Text style={styles.title}>Животное не найдено</Text>
+          <Text style={styles.notFoundTitle}>Животное не найдено</Text>
+          <Text style={styles.notFoundHint}>
+            Может, оно ещё ждёт встречи в игре «Алфавит»?
+          </Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.back()}
+            accessibilityLabel="На главную"
+            onPress={() => navigateHome(router)}
             style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
           >
-            <Text style={styles.backBtnText}>Назад</Text>
+            <Text style={styles.backBtnText}>На главную</Text>
           </Pressable>
         </View>
       </SafeAreaView>
@@ -251,82 +303,163 @@ export function AnimalDetailScreen({ animalId }: Props) {
     color: animal.color,
   };
 
+  const heroFg = contrastTextColor(animal.color);
+  const heroSecondaryFg = contrastSecondaryColor(animal.color);
+
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <Pressable onPress={() => router.back()} style={styles.back}>
-          <Text style={styles.backText}>← Зоопарк</Text>
-        </Pressable>
-        <Text style={styles.title}>{animal.title}</Text>
-        <View style={styles.back} />
-      </View>
-
-      {/* Сцена — фиксированная высота, небольшая */}
-      <View style={styles.sceneWrap}>
-        <AnimalScene asset={asset} animation="greet" width={220} height={180} />
-      </View>
-
-      {/* Чат — занимает всё оставшееся место, скроллится */}
-      <ScrollView
-        ref={scrollRef}
-        style={styles.chat}
-        contentContainerStyle={styles.chatContent}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={styles.kbRoot}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
       >
-        {history.map((m, i) => (
-          <View
-            key={i}
-            style={[styles.bubble, m.role === 'user' ? styles.bubbleUser : styles.bubbleAnimal]}
+        <View style={styles.inner}>
+          <View style={[styles.hero, { backgroundColor: animal.color }]}>
+            <View style={styles.heroHeader}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Назад"
+                onPress={() => (router.canGoBack() ? router.back() : router.replace('/zoo'))}
+                style={({ pressed }) => [styles.heroBack, pressed && { opacity: 0.7 }]}
+              >
+                <Text style={[styles.heroBackText, { color: heroFg }]}>← Зоопарк</Text>
+              </Pressable>
+              <View style={styles.heroStatus}>
+                <View style={[styles.statusDot, { backgroundColor: '#4ADE80' }]} />
+                <Text style={[styles.heroStatusText, { color: heroSecondaryFg }]}>в сети</Text>
+              </View>
+            </View>
+            <View style={styles.heroScene}>
+              <AnimalScene asset={asset} animation="greet" width={200} height={160} />
+            </View>
+            <Text style={[styles.heroTitle, { color: heroFg }]}>{animal.title}</Text>
+            <Text style={[styles.heroSubtitle, { color: heroSecondaryFg }]}>
+              Задавай вопросы — отвечу, как смогу!
+            </Text>
+          </View>
+
+          <ScrollView
+            ref={scrollRef}
+            style={styles.chat}
+            contentContainerStyle={styles.chatContent}
+            showsVerticalScrollIndicator={false}
           >
-            <Text
-              style={[
-                styles.bubbleText,
-                m.role === 'user' && styles.bubbleUserText,
-                m.sanitized && styles.bubbleSanitizedText,
+            {history.map((m) => {
+              const isUser = m.role === 'user';
+              return (
+                <View
+                  key={m.id}
+                  style={[
+                    styles.bubbleRow,
+                    isUser ? styles.bubbleRowUser : styles.bubbleRowAnimal,
+                  ]}
+                >
+                  {!isUser ? (
+                    <Text style={styles.animalAvatar} accessibilityElementsHidden>
+                      {animal.emoji}
+                    </Text>
+                  ) : null}
+                  <View
+                    style={[
+                      styles.bubble,
+                      isUser ? styles.bubbleUser : styles.bubbleAnimal,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.bubbleText,
+                        isUser && styles.bubbleUserText,
+                        m.sanitized && styles.bubbleSanitizedText,
+                      ]}
+                    >
+                      {m.content}
+                    </Text>
+                  </View>
+                </View>
+              );
+            })}
+            {isThinking ? (
+              <View style={[styles.bubbleRow, styles.bubbleRowAnimal]}>
+                <Text style={styles.animalAvatar} accessibilityElementsHidden>
+                  {animal.emoji}
+                </Text>
+                <View style={[styles.bubble, styles.bubbleAnimal, styles.thinkingBubble]}>
+                  <TypingIndicator />
+                </View>
+              </View>
+            ) : null}
+          </ScrollView>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.quickScroll}
+            contentContainerStyle={styles.quickContent}
+          >
+            {QUICK_QUESTIONS.map((q) => (
+              <Pressable
+                key={q}
+                disabled={isThinking}
+                onPress={() => sendMessage(q)}
+                accessibilityRole="button"
+                style={({ pressed }) => [
+                  styles.quickChip,
+                  pressed && !isThinking && styles.pressed,
+                  isThinking && styles.quickDisabled,
+                ]}
+              >
+                <Text style={styles.quickChipText} numberOfLines={1}>
+                  {q}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <View style={styles.inputBar}>
+            <TextInput
+              style={styles.input}
+              value={input}
+              onChangeText={setInput}
+              placeholder={`Напиши ${animal.title.toLowerCase()}…`}
+              placeholderTextColor={theme.colors.textMuted}
+              editable={!isThinking}
+              maxLength={MAX_INPUT_LENGTH}
+              multiline
+              returnKeyType="send"
+              onSubmitEditing={handleSubmit}
+              blurOnSubmit
+              accessibilityLabel="Поле ввода сообщения"
+            />
+            {voice.available ? (
+              <View style={styles.micSlot}>
+                <MicButton
+                  state={voice.micState}
+                  transcript={voice.transcript}
+                  onPress={voice.toggle}
+                />
+              </View>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Отправить"
+              disabled={isThinking || !input.trim()}
+              onPress={handleSubmit}
+              style={({ pressed }) => [
+                styles.sendBtn,
+                (!input.trim() || isThinking) && styles.sendBtnDisabled,
+                pressed && input.trim() && !isThinking && styles.sendBtnPressed,
               ]}
             >
-              {m.content}
-            </Text>
+              <Text style={styles.sendBtnText}>→</Text>
+            </Pressable>
           </View>
-        ))}
-        {isThinking ? (
-          <View style={[styles.bubble, styles.bubbleAnimal, styles.thinkingBubble]}>
-            <TypingIndicator />
-          </View>
-        ) : null}
-      </ScrollView>
-
-      {/* Quick-кнопки — компактные */}
-      <View style={styles.quickRow}>
-        {QUICK_QUESTIONS.map((q) => (
-          <Pressable
-            key={q}
-            disabled={isThinking}
-            onPress={() => sendMessage(q)}
-            accessibilityRole="button"
-            style={({ pressed }) => [
-              styles.quickBtn,
-              pressed && !isThinking && styles.pressed,
-              isThinking && styles.quickDisabled,
-            ]}
-          >
-            <Text style={styles.quickText} numberOfLines={1}>
-              {q}
+          {!voice.available ? (
+            <Text style={styles.micHint}>
+              Голос на этом устройстве не поддерживается — пиши текстом или выбирай вопросы выше.
             </Text>
-          </Pressable>
-        ))}
-      </View>
-
-      {/* Микрофон — самый низ */}
-      <View style={styles.micZone}>
-        {voice.available ? (
-          <MicButton state={voice.micState} transcript={voice.transcript} onPress={voice.toggle} />
-        ) : (
-          <Text style={styles.voiceHint}>
-            На этом устройстве голос не поддерживается. Выбери вопрос выше ↑
-          </Text>
-        )}
-      </View>
+          ) : null}
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -336,62 +469,119 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
-  header: {
+  kbRoot: {
+    flex: 1,
+  },
+  inner: {
+    flex: 1,
+    maxWidth: 760,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  hero: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingTop: theme.spacing.md,
+    paddingBottom: theme.spacing.lg,
+    borderBottomLeftRadius: 28,
+    borderBottomRightRadius: 28,
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  heroHeader: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  heroBack: {
+    paddingVertical: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.xs,
+  },
+  heroBackText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  heroStatus: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: theme.spacing.lg,
-    paddingVertical: theme.spacing.sm,
+    gap: 6,
   },
-  back: {
-    minWidth: 90,
-    paddingVertical: theme.spacing.sm,
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
-  backText: {
-    fontSize: 16,
-    color: theme.colors.accent,
+  heroStatusText: {
+    fontSize: 13,
     fontWeight: '600',
   },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: theme.colors.text,
+  heroScene: {
+    marginTop: theme.spacing.xs,
+    marginBottom: theme.spacing.xs,
   },
-  sceneWrap: {
-    alignItems: 'center',
-    paddingBottom: theme.spacing.sm,
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   chat: {
     flex: 1,
-    paddingHorizontal: theme.spacing.lg,
   },
   chatContent: {
+    paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
     gap: theme.spacing.sm,
   },
+  bubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: theme.spacing.xs,
+    maxWidth: '92%',
+  },
+  bubbleRowUser: {
+    alignSelf: 'flex-end',
+    justifyContent: 'flex-end',
+  },
+  bubbleRowAnimal: {
+    alignSelf: 'flex-start',
+  },
+  animalAvatar: {
+    fontSize: 26,
+    lineHeight: 30,
+    width: 32,
+    textAlign: 'center',
+  },
   bubble: {
-    maxWidth: '82%',
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
     borderRadius: 18,
+    maxWidth: '100%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
     elevation: 1,
   },
   bubbleAnimal: {
-    alignSelf: 'flex-start',
     backgroundColor: theme.colors.surface,
     borderBottomLeftRadius: 6,
   },
   bubbleUser: {
-    alignSelf: 'flex-end',
     backgroundColor: theme.colors.accent,
     borderBottomRightRadius: 6,
   },
   thinkingBubble: {
-    paddingVertical: theme.spacing.xs,
+    paddingVertical: theme.spacing.sm + 2,
     minWidth: 60,
   },
   bubbleText: {
@@ -407,17 +597,17 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     opacity: 0.9,
   },
-  quickRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: theme.spacing.xs,
+  quickScroll: {
+    flexGrow: 0,
+  },
+  quickContent: {
+    paddingHorizontal: theme.spacing.lg,
+    paddingVertical: theme.spacing.sm,
+    gap: theme.spacing.sm,
+  },
+  quickChip: {
     paddingHorizontal: theme.spacing.md,
     paddingVertical: theme.spacing.sm,
-  },
-  quickBtn: {
-    paddingHorizontal: theme.spacing.md,
-    paddingVertical: theme.spacing.xs + 2,
     backgroundColor: theme.colors.surface,
     borderRadius: theme.radii.full,
     borderWidth: 1,
@@ -426,19 +616,65 @@ const styles = StyleSheet.create({
   quickDisabled: {
     opacity: 0.5,
   },
-  quickText: {
-    fontSize: 13,
+  quickChipText: {
+    fontSize: 14,
     color: theme.colors.text,
     fontWeight: '600',
   },
-  micZone: {
-    paddingBottom: theme.spacing.sm,
+  inputBar: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: theme.spacing.sm,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    backgroundColor: theme.colors.surface,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
   },
-  voiceHint: {
-    padding: theme.spacing.md,
+  input: {
+    flex: 1,
+    minHeight: 44,
+    maxHeight: 120,
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radii.md,
+    backgroundColor: theme.colors.background,
+    fontSize: 16,
+    color: theme.colors.text,
+  },
+  micSlot: {
+    // MicButton рендерит большую кнопку с transcript; в compact-панели берём
+    // только её визуальную часть — но поскольку MicButton сам по себе сложный,
+    // проще дать ему место с фиксированной шириной, а pills-transcript показывать
+    // через отдельный hint. Пока — компактный wrap.
+    minWidth: 44,
+  },
+  sendBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendBtnDisabled: {
+    opacity: 0.4,
+  },
+  sendBtnPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.96 }],
+  },
+  sendBtnText: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: '800',
+    lineHeight: 26,
+  },
+  micHint: {
+    padding: theme.spacing.sm,
     textAlign: 'center',
     color: theme.colors.textMuted,
-    fontSize: 13,
+    fontSize: 12,
   },
   center: {
     flex: 1,
@@ -446,6 +682,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: theme.spacing.lg,
     padding: theme.spacing.xl,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: theme.colors.textMuted,
+  },
+  notFoundTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  notFoundHint: {
+    fontSize: 15,
+    color: theme.colors.textMuted,
+    textAlign: 'center',
+    maxWidth: 320,
   },
   backBtn: {
     paddingHorizontal: theme.spacing.xl,

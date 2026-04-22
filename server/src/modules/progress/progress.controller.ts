@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Post,
@@ -27,6 +29,7 @@ import {
   type UnlockAnimalDto,
 } from './dto/session.schema';
 import {
+  ResetProgressPresenter,
   SessionPresenter,
   UnlockedAnimalPresenter,
 } from './presenter/session.presenter';
@@ -97,5 +100,18 @@ export class ProgressController {
     const childId = childIdFromRequest(req);
     const items = await this.progress.listUnlocked(childId);
     return UnlockedAnimalPresenter.collection(items);
+  }
+
+  /**
+   * Полный сброс прогресса ребёнка (открытые животные + сессии + попытки).
+   * Вызывается из «Настройки → Сбросить прогресс». JWT гарантирует, что ребёнок
+   * может снести только свои данные.
+   */
+  @Delete('reset')
+  @HttpCode(200)
+  async reset(@Req() req: AuthenticatedRequest): Promise<ResetProgressPresenter> {
+    const childId = childIdFromRequest(req);
+    const result = await this.progress.resetProgress(childId);
+    return new ResetProgressPresenter(result);
   }
 }

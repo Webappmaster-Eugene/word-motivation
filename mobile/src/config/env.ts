@@ -10,6 +10,14 @@ const extraSchema = z.object({
     .string()
     .url('apiBaseUrl должен быть валидным URL')
     .default('http://localhost:3000'),
+  /**
+   * Режим TTS на клиенте:
+   *  - `server` — нейросетевой Silero через backend (по умолчанию, лучшее качество).
+   *  - `native` — принудительно expo-speech (fallback/deprecated): использовать
+   *    когда нужно отключить серверный TTS (локальный dev без sidecar'а,
+   *    тесты). Запись в `EXPO_PUBLIC_TTS_MODE`.
+   */
+  ttsMode: z.enum(['server', 'native']).default('server'),
 });
 
 function readExtra(): z.infer<typeof extraSchema> {
@@ -26,6 +34,7 @@ const cached = readExtra();
 
 export const env = {
   apiBaseUrl: cached.apiBaseUrl.replace(/\/+$/, ''), // без trailing-slash
+  ttsMode: cached.ttsMode,
 } as const;
 
 export type Env = typeof env;

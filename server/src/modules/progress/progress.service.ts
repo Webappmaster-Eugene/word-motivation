@@ -101,4 +101,49 @@ export class ProgressService {
       orderBy: { unlockedAt: 'desc' },
     });
   }
+
+  /**
+   * Полный сброс прогресса ребёнка.
+   *
+   * Сносит:
+   *  - все открытые животные (`UnlockedAnimal`);
+   *  - все попытки в сессиях ребёнка (`Attempt`), потому что они ссылаются на
+   *    сессию по `sessionId` (FK без ON DELETE CASCADE в prisma-схеме — удаляем
+   *    вручную, чтобы не упасть на FK-constraint);
+   *  - все сессии (`Session`).
+   *
+   * Выполняется в транзакции, чтобы либо всё сбросилось, либо ничего
+   * (иначе zoo мог бы остаться пустым, но session-history сохранилась бы и
+   * ребёнок увидел старые attempts).
+   *
+   * Возвращает количество удалённых записей по категориям — нужно для
+   * UI-подтверждения и телеметрии.
+   */
+  async resetProgress(childId: string): Promise<{
+    unlockedAnimals: number;
+    sessions: number;
+    attempts: number;
+  }> {
+    return this.prisma.$transaction(async (tx) => {
+      const sessions = await tx.session.findMany({
+        where: { childId },
+        select: { id: true },
+      });
+      const sessionIds = sessions.map((s) => s.id);
+
+      const attempts = sessionIds.length
+        ? await tx.attempt.deleteMany({ where: { sessionId: { in: sessionIds } } })
+        : { count: 0 };
+      const sessionsDeleted = sessionIds.length
+        ? await tx.session.deleteMany({ where: { id: { in: sessionIds } } })
+        : { count: 0 };
+      const unlocked = await tx.unlockedAnimal.deleteMany({ where: { childId } });
+
+      return {
+        unlockedAnimals: unlocked.count,
+        sessions: sessionsDeleted.count,
+        attempts: attempts.count,
+      };
+    });
+  }
 }

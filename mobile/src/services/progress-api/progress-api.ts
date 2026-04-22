@@ -36,6 +36,12 @@ export interface UnlockedAnimalResponse {
   readonly visits: number;
 }
 
+export interface ResetProgressResponse {
+  readonly unlockedAnimals: number;
+  readonly sessions: number;
+  readonly attempts: number;
+}
+
 /**
  * Клиент к /progress/*. Все методы требуют предварительной регистрации устройства
  * (DeviceAuthService.ensure()) — токен пробрасывается автоматически.
@@ -96,6 +102,22 @@ export class ProgressApi {
     const session = await this.auth.ensure();
     return this.api.request<readonly UnlockedAnimalResponse[]>({
       path: '/progress/unlocked',
+      token: session.token,
+    });
+  }
+
+  /**
+   * Полностью сносит прогресс ребёнка на сервере (unlocked + sessions + attempts).
+   * Вызывается из settings → «Сбросить прогресс». Без этого метода сброс на
+   * клиенте убирал только localUnlocked, а listUnlocked() при следующем открытии
+   * зоопарка снова наливал всех животных как открытых — визуально выглядело, что
+   * сброс не работает.
+   */
+  async resetProgress(): Promise<ResetProgressResponse> {
+    const session = await this.auth.ensure();
+    return this.api.request<ResetProgressResponse>({
+      method: 'DELETE',
+      path: '/progress/reset',
       token: session.token,
     });
   }

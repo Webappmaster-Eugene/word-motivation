@@ -10,6 +10,7 @@ import { ChatModule } from './modules/chat/chat.module';
 import { ContentModule } from './modules/content/content.module';
 import { HealthModule } from './modules/health/health.module';
 import { ProgressModule } from './modules/progress/progress.module';
+import { TtsModule } from './modules/tts/tts.module';
 
 @Module({
   imports: [
@@ -50,6 +51,11 @@ import { ProgressModule } from './modules/progress/progress.module';
             ttl: 60_000,
             limit: config.getOrThrow('RATE_LIMIT_CHAT_IP_PER_MIN', { infer: true }),
           },
+          {
+            name: 'tts',
+            ttl: 60_000,
+            limit: config.getOrThrow('TTS_RATE_LIMIT_PER_MIN', { infer: true }),
+          },
         ],
       }),
     }),
@@ -58,6 +64,7 @@ import { ProgressModule } from './modules/progress/progress.module';
     ContentModule,
     ProgressModule,
     ChatModule,
+    TtsModule,
     HealthModule,
   ],
 })

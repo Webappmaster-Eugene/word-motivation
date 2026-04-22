@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
+import { contrastTextColor } from '@/shared/theme/contrast';
 import { theme } from '@/shared/theme';
 
 import type { ZooAnimal } from '../hooks/use-zoo-data';
@@ -11,6 +12,7 @@ interface AnimalTileProps {
 
 export function AnimalTile({ animal, onPress }: AnimalTileProps) {
   const locked = !animal.unlocked;
+  const fg = locked ? theme.colors.textMuted : contrastTextColor(animal.color);
   return (
     <Pressable
       accessibilityRole="button"
@@ -30,11 +32,14 @@ export function AnimalTile({ animal, onPress }: AnimalTileProps) {
       <Text style={[styles.emoji, locked && styles.emojiLocked]}>
         {locked ? '❓' : animal.emoji}
       </Text>
-      <Text style={[styles.title, locked && styles.titleLocked]} numberOfLines={1}>
+      <Text
+        style={[styles.title, { color: fg }, !locked && styles.titleShadow]}
+        numberOfLines={1}
+      >
         {locked ? '???' : animal.title}
       </Text>
       {animal.unlocked && animal.visits > 1 ? (
-        <Text style={styles.visits}>×{animal.visits}</Text>
+        <Text style={[styles.visits, { color: fg }]}>×{animal.visits}</Text>
       ) : null}
     </Pressable>
   );
@@ -69,22 +74,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#fff',
     textAlign: 'center',
-    textShadowColor: 'rgba(0,0,0,0.35)',
+  },
+  titleShadow: {
+    textShadowColor: 'rgba(0,0,0,0.15)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
-  },
-  titleLocked: {
-    color: theme.colors.textMuted,
-    textShadowColor: 'transparent',
   },
   visits: {
     position: 'absolute',
     top: 6,
     right: 8,
     fontSize: 12,
-    color: '#fff',
     fontWeight: '800',
   },
 });

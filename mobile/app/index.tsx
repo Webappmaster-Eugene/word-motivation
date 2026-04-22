@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -7,30 +7,46 @@ import { DailyQuestCard } from '@/shared/ui/daily-quest-card';
 import { theme } from '@/shared/theme';
 
 /**
- * Hub — главный экран: плитки игр + Зоопарк (коллекция открытых животных).
+ * Hub — главный экран: плитки игр + Зоопарк (коллекция открытых животных)
+ * + футер с ссылками на юридические разделы.
+ *
+ * На web контент ограничен `maxWidth: 720`, чтобы на десктопе не «растекался»
+ * по всей ширине экрана и карточки имели комфортный визуальный вес.
  */
 export default function HubScreen() {
+  const router = useRouter();
   const games = gameRegistry.list();
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-      <View style={styles.header}>
-        <Text style={styles.title}>Играй и учись</Text>
-        <Text style={styles.subtitle}>Выбери игру</Text>
-      </View>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.inner}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Играй и учись</Text>
+            <Text style={styles.subtitle}>Выбери игру или зайди в гости к животным</Text>
+          </View>
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.daily}>
-          <DailyQuestCard />
-        </View>
-        <View style={styles.row}>
-          {games.map((item) => (
-            <Link
-              key={item.metadata.id}
-              href={{ pathname: '/games/[gameId]', params: { gameId: item.metadata.id } }}
-              asChild
-            >
-              <Pressable style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}>
+          <View style={styles.daily}>
+            <DailyQuestCard />
+          </View>
+
+          <View style={styles.row}>
+            {games.map((item) => (
+              <Pressable
+                key={item.metadata.id}
+                accessibilityRole="button"
+                accessibilityLabel={`Запустить игру: ${item.metadata.title}`}
+                onPress={() =>
+                  router.push({
+                    pathname: '/games/[gameId]',
+                    params: { gameId: item.metadata.id },
+                  })
+                }
+                style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
+              >
                 <Text style={styles.tileEmoji}>🔤</Text>
                 <View style={styles.tileBottom}>
                   <Text style={styles.tileTitle}>{item.metadata.title}</Text>
@@ -42,11 +58,12 @@ export default function HubScreen() {
                   </Text>
                 </View>
               </Pressable>
-            </Link>
-          ))}
+            ))}
 
-          <Link href="/zoo" asChild>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Открыть Зоопарк"
+              onPress={() => router.push('/zoo')}
               style={({ pressed }) => [
                 styles.tile,
                 styles.zooTile,
@@ -60,16 +77,41 @@ export default function HubScreen() {
                 <Text style={styles.tileAge}>любой возраст</Text>
               </View>
             </Pressable>
-          </Link>
-        </View>
+          </View>
 
-        <Link href="/settings" asChild>
-          <Pressable style={({ pressed }) => [styles.settingsLink, pressed && styles.pressed]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Открыть настройки"
+            onPress={() => router.push('/settings')}
+            style={({ pressed }) => [styles.settingsLink, pressed && styles.pressed]}
+          >
             <Text style={styles.settingsText}>⚙️ Настройки</Text>
           </Pressable>
-        </Link>
+
+          <View style={styles.footer}>
+            <FooterLink label="О проекте" onPress={() => router.push('/about')} />
+            <Text style={styles.footerDot}>·</Text>
+            <FooterLink label="Конфиденциальность" onPress={() => router.push('/privacy')} />
+            <Text style={styles.footerDot}>·</Text>
+            <FooterLink label="Условия" onPress={() => router.push('/terms')} />
+            <Text style={styles.footerDot}>·</Text>
+            <FooterLink label="Контакты" onPress={() => router.push('/contacts')} />
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function FooterLink({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="link"
+      onPress={onPress}
+      style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+    >
+      <Text style={styles.footerLink}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -78,24 +120,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: theme.colors.background,
   },
+  scroll: {
+    flexGrow: 1,
+    paddingBottom: theme.spacing.xxl,
+  },
+  inner: {
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
+    paddingHorizontal: theme.spacing.lg,
+  },
   header: {
-    paddingHorizontal: theme.spacing.xl,
     paddingTop: theme.spacing.xl,
     paddingBottom: theme.spacing.lg,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '700',
+    fontSize: 34,
+    fontWeight: '800',
     color: theme.colors.text,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 18,
+    fontSize: 16,
     color: theme.colors.textMuted,
     marginTop: theme.spacing.xs,
-  },
-  scroll: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: theme.spacing.xxl,
   },
   daily: {
     marginBottom: theme.spacing.lg,
@@ -106,7 +154,9 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
   },
   tile: {
-    width: '48%',
+    flexBasis: '48%',
+    flexGrow: 1,
+    minWidth: 160,
     aspectRatio: 1,
     borderRadius: theme.radii.lg,
     backgroundColor: theme.colors.surface,
@@ -114,15 +164,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
     elevation: 2,
   },
   zooTile: {
     backgroundColor: '#D8F3DC',
   },
   tilePressed: {
-    opacity: 0.85,
+    opacity: 0.88,
     transform: [{ scale: 0.98 }],
   },
   tileEmoji: {
@@ -164,5 +214,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: theme.colors.text,
     fontWeight: '600',
+  },
+  footer: {
+    marginTop: theme.spacing.xl,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: theme.spacing.xs,
+  },
+  footerLink: {
+    fontSize: 13,
+    color: theme.colors.textMuted,
+    fontWeight: '500',
+  },
+  footerDot: {
+    fontSize: 13,
+    color: theme.colors.textMuted,
   },
 });

@@ -29,3 +29,19 @@ export class UnlockedAnimalPresenter {
     return items.map((x) => new UnlockedAnimalPresenter(x));
   }
 }
+
+export class ResetProgressPresenter {
+  readonly unlockedAnimals: number;
+  readonly sessions: number;
+  readonly attempts: number;
+
+  constructor(params: {
+    readonly unlockedAnimals: number;
+    readonly sessions: number;
+    readonly attempts: number;
+  }) {
+    this.unlockedAnimals = params.unlockedAnimals;
+    this.sessions = params.sessions;
+    this.attempts = params.attempts;
+  }
+}

@@ -15,8 +15,33 @@ import { StubAsr } from '@/services/speech-recognition/stub-asr';
 import type { SpeechRecognitionService } from '@/services/speech-recognition/types';
 import { WebSpeechAsr } from '@/services/speech-recognition/web-speech-asr';
 import { ExpoSpeechTts } from '@/services/speech-synthesis/expo-speech-tts';
+import { ServerTts } from '@/services/speech-synthesis/server-tts';
+import type { SpeechSynthesisService } from '@/services/speech-synthesis/types';
 
 import type { ServiceBundle } from './types';
+
+/**
+ * Выбирает реализацию TTS. Безопасный default: `ServerTts` поверх Silero с
+ * внутренним автофолбэком на `ExpoSpeechTts` при любой сетевой/серверной
+ * ошибке. Принудительный `native` — если `EXPO_PUBLIC_TTS_MODE=native`
+ * (локальный dev без sidecar'а, или нужно быстро вернуть старое поведение).
+ *
+ * Важный инвариант: даже в режиме `server` базовый `ExpoSpeechTts` всегда
+ * создаётся (как fallback). Это гарантирует, что озвучка работает в любом
+ * режиме — пусть хуже по качеству, но не молча.
+ */
+function pickSpeechSynthesis(
+  apiClient: ApiClient,
+  deviceAuth: DeviceAuthService,
+): SpeechSynthesisService {
+  const expoTts = new ExpoSpeechTts();
+  if (env.ttsMode === 'native') return expoTts;
+  return new ServerTts(apiClient, deviceAuth, {
+    apiBaseUrl: env.apiBaseUrl,
+    defaultVoice: 'xenia',
+    fallback: expoTts,
+  });
+}
 
 function pickSpeechRecognition(): SpeechRecognitionService {
   if (Platform.OS === 'web') {
@@ -58,7 +83,7 @@ export function createServiceBundle(): ServiceBundle {
 
   return {
     speechRecognition: pickSpeechRecognition(),
-    speechSynthesis: new ExpoSpeechTts(),
+    speechSynthesis: pickSpeechSynthesis(apiClient, deviceAuth),
     animalScene: new SkiaFallbackScene(),
     apiClient,
     deviceAuth,
