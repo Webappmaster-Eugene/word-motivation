@@ -51,6 +51,13 @@ const styles = StyleSheet.create({
     gap: theme.spacing.md,
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
+    // На десктопе кнопки не должны растягиваться на всю ширину viewport —
+    // выглядит неуклюже и «теряются» среди пустого пространства. maxWidth
+    // + alignSelf центрирует панель с разумной шириной, на мобайле
+    // работает автоматически (контент уже <= 720).
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
   },
   button: {
     flex: 1,

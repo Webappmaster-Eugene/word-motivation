@@ -92,8 +92,11 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       typedRoutes: true,
     },
     extra: {
-      apiBaseUrl:
-        process.env.EXPO_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL ?? 'http://10.0.2.2:3000',
+      // apiBaseUrl берётся из env; если не задан — дефолт выбирается в
+      // `src/config/env.ts` по `Platform.OS` (на android — 10.0.2.2, на web —
+      // localhost). Здесь нельзя сделать Platform-specific, т.к. конфиг
+      // исполняется один раз в Node и уезжает в extra для обеих платформ.
+      apiBaseUrl: process.env.EXPO_PUBLIC_API_BASE_URL ?? process.env.API_BASE_URL,
       ttsMode: process.env.EXPO_PUBLIC_TTS_MODE ?? 'server',
       eas: {
         projectId,

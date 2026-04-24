@@ -1,5 +1,16 @@
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { z } from 'zod';
+
+/**
+ * Platform-specific дефолт для apiBaseUrl.
+ *  - `web`      → `http://localhost:3000` (dev-сервер на той же машине).
+ *  - `android`  → `http://10.0.2.2:3000` (loopback из эмулятора на хост).
+ *  - `ios` и пр. → `http://localhost:3000`.
+ * Явный `EXPO_PUBLIC_API_BASE_URL` всегда перекрывает дефолт.
+ */
+const defaultApiBaseUrl =
+  Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
 
 /**
  * Схема `extra`-поля из `app.config.ts`. Валидируем на старте, чтобы падать
@@ -9,7 +20,7 @@ const extraSchema = z.object({
   apiBaseUrl: z
     .string()
     .url('apiBaseUrl должен быть валидным URL')
-    .default('http://localhost:3000'),
+    .default(defaultApiBaseUrl),
   /**
    * Режим TTS на клиенте:
    *  - `server` — нейросетевой Silero через backend (по умолчанию, лучшее качество).

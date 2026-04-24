@@ -18,14 +18,11 @@ RUN npm ci --no-audit --no-fund
 # Затем исходники
 COPY . .
 
-# Экспорт web-сборки (Expo SDK 52+, output: 'single' → SPA в dist-web/)
+# Экспорт web-сборки (Expo SDK 52+, output: 'single' → SPA в dist-web/).
+# canvaskit.wasm копируется postinstall-хуком в public/ и автоматически
+# попадает в dist-web/canvaskit.wasm — см. SkiaInit.web.tsx, который
+# грузит его по абсолютному пути "/canvaskit.wasm".
 RUN npx expo export --platform web --output-dir dist-web
-
-# canvaskit.wasm — Skia (react-native-skia) на web использует CanvasKit-WASM.
-# По умолчанию CanvasKit ищет WASM относительно текущего URL; SkiaInit в _layout.tsx
-# переопределяет `locateFile` на абсолютный "/canvaskit.wasm" — поэтому копируем
-# сам файл в корень статики.
-RUN cp node_modules/canvaskit-wasm/bin/full/canvaskit.wasm dist-web/canvaskit.wasm
 
 # ───── runtime ─────
 FROM nginx:1.27-alpine AS runtime

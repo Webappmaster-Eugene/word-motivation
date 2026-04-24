@@ -19,3 +19,4 @@ android/
 !.vscode/settings.json
 !.vscode/extensions.json
 expo-env.d.ts
+public/canvaskit.wasm

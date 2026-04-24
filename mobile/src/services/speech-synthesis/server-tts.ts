@@ -212,13 +212,16 @@ export class ServerTts implements SpeechSynthesisService {
 
   private async synthesize(text: string, opts: TtsSpeakOptions): Promise<SynthesizeResponse> {
     const session = await this.auth.ensure();
+    // opts.voice задаётся из SPEECH_PRESETS (kseniya для букв, baya для слов/реплик).
+    // Если не задан — используем клиентский дефолт, который берётся из конфига сервера.
+    const voice = (opts.voice as SileroVoice | undefined) ?? this.options.defaultVoice;
     return this.api.request<SynthesizeResponse>({
       method: 'POST',
       path: '/tts/synthesize',
       token: session.token,
       body: {
         text,
-        voice: this.options.defaultVoice,
+        voice,
         ...(opts.rate !== undefined ? { rate: opts.rate } : {}),
       },
       timeoutMs: 20_000,

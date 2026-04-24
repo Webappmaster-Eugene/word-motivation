@@ -46,11 +46,29 @@ export function AnimalRevealCard({
   useEffect(() => {
     let cancelled = false;
     setSceneReady(false);
-    void sceneService.preload(asset).then(() => {
+
+    // Safety-timeout: если preload завис (сеть, ошибка движка) — не оставляем
+    // бесконечный лоадер «Готовим сцену…». 5 с достаточно для любого устройства.
+    const timeout = setTimeout(() => {
       if (!cancelled) setSceneReady(true);
-    });
+    }, 5000);
+
+    void sceneService
+      .preload(asset)
+      .then(() => {
+        if (!cancelled) setSceneReady(true);
+      })
+      .catch(() => {
+        // Сцена не загрузилась, но показываем её — SkiaFallback не требует preload.
+        if (!cancelled) setSceneReady(true);
+      })
+      .finally(() => {
+        clearTimeout(timeout);
+      });
+
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
     };
   }, [asset, sceneService]);
 
@@ -76,7 +94,13 @@ export function AnimalRevealCard({
         {/* Hero-баннер: цвет животного, scene + title посередине, без Верхнего padding'а (у AlphabetGame есть свой header). */}
         <View style={[styles.hero, { backgroundColor: animal.color }]}>
           {sceneReady ? (
-            <AnimalScene asset={asset} animation="greet" width={180} height={150} />
+            <AnimalScene
+              asset={asset}
+              animation="greet"
+              width={180}
+              height={150}
+              showTitle={false}
+            />
           ) : (
             <View style={styles.loaderCompact}>
               <Text style={styles.loaderText}>Готовим сцену…</Text>

@@ -59,7 +59,7 @@ export const envSchema = z.object({
   TTS_MAX_CACHE_MB: z.coerce.number().int().positive().max(10_000).default(512),
   TTS_DEFAULT_VOICE: z
     .enum(['xenia', 'kseniya', 'baya', 'aidar', 'eugene'])
-    .default('xenia'),
+    .default('baya'),
   TTS_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
   TTS_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(60),
 });

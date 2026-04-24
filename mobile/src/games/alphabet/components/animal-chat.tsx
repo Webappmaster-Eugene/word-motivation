@@ -28,6 +28,15 @@ const MAX_INPUT_LENGTH = 500;
 // Режем с запасом: -2 чтобы оставить место новому user-сообщению и его ответу.
 const MAX_HISTORY_FOR_REQUEST = 18;
 
+// Пресет вопросов — те же что в AnimalDetailScreen, для визуальной
+// согласованности между двумя чат-экранами.
+const QUICK_QUESTIONS: readonly string[] = [
+  'Что ты любишь кушать?',
+  'Где ты живёшь?',
+  'Что ты умеешь?',
+  'Расскажи про себя',
+];
+
 type LocalMessage =
   | { readonly kind: 'greeting'; readonly content: string }
   | (ChatHistoryEntry & { readonly kind: 'chat' });
@@ -51,51 +60,53 @@ export function AnimalChat({ sessionId, animal }: AnimalChatProps) {
   const canSend =
     !sending && input.trim().length > 0 && input.trim().length <= MAX_INPUT_LENGTH && sessionId !== null;
 
-  const send = useCallback(async () => {
-    const text = input.trim();
-    if (!text || sending) return;
-    if (!sessionId) {
-      setError('Сессия ещё не готова, подожди секунду и попробуй снова.');
-      return;
-    }
+  const sendText = useCallback(
+    async (text: string) => {
+      if (!text || sending) return;
+      if (!sessionId) {
+        setError('Сессия ещё не готова, подожди секунду и попробуй снова.');
+        return;
+      }
 
-    const userMsg: LocalMessage = { kind: 'chat', role: 'user', content: text };
-    const priorHistory: ChatHistoryEntry[] = messages
-      .filter((m): m is LocalMessage & { kind: 'chat' } => m.kind === 'chat')
-      .map(({ role, content }) => ({ role, content }));
+      const userMsg: LocalMessage = { kind: 'chat', role: 'user', content: text };
+      const priorHistory: ChatHistoryEntry[] = messages
+        .filter((m): m is LocalMessage & { kind: 'chat' } => m.kind === 'chat')
+        .map(({ role, content }) => ({ role, content }));
 
-    setMessages((prev) => [...prev, userMsg]);
-    setInput('');
-    setError(null);
-    setSending(true);
+      setMessages((prev) => [...prev, userMsg]);
+      setInput('');
+      setError(null);
+      setSending(true);
 
-    try {
-      const response = await llm.reply({
-        sessionId,
-        animalId: animal.id,
-        userText: text,
-        history: priorHistory.slice(-MAX_HISTORY_FOR_REQUEST),
-      });
-      const assistantMsg: LocalMessage = {
-        kind: 'chat',
-        role: 'assistant',
-        content: response.reply,
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
-      void tts.speak(response.reply);
-    } catch (err) {
-      const friendly =
-        err instanceof Error && err.message.includes('429')
-          ? 'Слишком много сообщений подряд. Подожди немного.'
-          : 'Не получилось отправить. Проверь интернет и попробуй снова.';
-      setError(friendly);
-    } finally {
-      setSending(false);
-    }
-  }, [input, sending, sessionId, messages, llm, animal.id, tts]);
+      try {
+        const response = await llm.reply({
+          sessionId,
+          animalId: animal.id,
+          userText: text,
+          history: priorHistory.slice(-MAX_HISTORY_FOR_REQUEST),
+        });
+        const assistantMsg: LocalMessage = {
+          kind: 'chat',
+          role: 'assistant',
+          content: response.reply,
+        };
+        setMessages((prev) => [...prev, assistantMsg]);
+        void tts.speak(response.reply);
+      } catch (err) {
+        const friendly =
+          err instanceof Error && err.message.includes('429')
+            ? 'Слишком много сообщений подряд. Подожди немного.'
+            : 'Не получилось отправить. Проверь интернет и попробуй снова.';
+        setError(friendly);
+      } finally {
+        setSending(false);
+      }
+    },
+    [sending, sessionId, messages, llm, animal.id, tts],
+  );
 
   const handleSubmit = () => {
-    void send();
+    void sendText(input.trim());
   };
 
   return (
@@ -115,16 +126,38 @@ export function AnimalChat({ sessionId, animal }: AnimalChatProps) {
           return (
             <View
               key={`${idx}-${msg.kind}`}
-              style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}
+              style={[
+                styles.bubbleRow,
+                isUser ? styles.bubbleRowUser : styles.bubbleRowAnimal,
+              ]}
               accessibilityLabel={isUser ? 'Ты' : animal.title}
             >
-              <Text style={[styles.bubbleText, isUser && styles.bubbleTextUser]}>{msg.content}</Text>
+              {!isUser ? (
+                <Text style={styles.animalAvatar} accessibilityElementsHidden>
+                  {animal.emoji}
+                </Text>
+              ) : null}
+              <View
+                style={[
+                  styles.bubble,
+                  isUser ? styles.bubbleUser : styles.bubbleAssistant,
+                ]}
+              >
+                <Text style={[styles.bubbleText, isUser && styles.bubbleTextUser]}>
+                  {msg.content}
+                </Text>
+              </View>
             </View>
           );
         })}
         {sending ? (
-          <View style={[styles.bubble, styles.bubbleAssistant]}>
-            <TypingIndicator />
+          <View style={[styles.bubbleRow, styles.bubbleRowAnimal]}>
+            <Text style={styles.animalAvatar} accessibilityElementsHidden>
+              {animal.emoji}
+            </Text>
+            <View style={[styles.bubble, styles.bubbleAssistant, styles.thinkingBubble]}>
+              <TypingIndicator />
+            </View>
           </View>
         ) : null}
         {error ? (
@@ -132,6 +165,33 @@ export function AnimalChat({ sessionId, animal }: AnimalChatProps) {
             <Text style={styles.errorText}>{error}</Text>
           </View>
         ) : null}
+      </ScrollView>
+
+      {/* Чипы-готовых-вопросов — помогают ребёнку начать диалог без клавиатуры */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.quickScroll}
+        contentContainerStyle={styles.quickContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        {QUICK_QUESTIONS.map((q) => (
+          <Pressable
+            key={q}
+            disabled={sending}
+            onPress={() => void sendText(q)}
+            accessibilityRole="button"
+            style={({ pressed }) => [
+              styles.quickChip,
+              pressed && !sending && styles.quickPressed,
+              sending && styles.quickDisabled,
+            ]}
+          >
+            <Text style={styles.quickChipText} numberOfLines={1}>
+              {q}
+            </Text>
+          </Pressable>
+        ))}
       </ScrollView>
 
       <View style={styles.inputRow}>
@@ -180,20 +240,47 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     gap: theme.spacing.sm,
   },
+  bubbleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: theme.spacing.xs,
+    maxWidth: '92%',
+  },
+  bubbleRowUser: {
+    alignSelf: 'flex-end',
+    justifyContent: 'flex-end',
+  },
+  bubbleRowAnimal: {
+    alignSelf: 'flex-start',
+  },
+  animalAvatar: {
+    fontSize: 26,
+    lineHeight: 30,
+    width: 32,
+    textAlign: 'center',
+  },
   bubble: {
-    maxWidth: '85%',
-    paddingVertical: theme.spacing.sm,
     paddingHorizontal: theme.spacing.md,
-    borderRadius: theme.radii.md,
-    marginBottom: theme.spacing.xs,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: 18,
+    maxWidth: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 3,
+    elevation: 1,
   },
   bubbleAssistant: {
-    alignSelf: 'flex-start',
     backgroundColor: theme.colors.surface,
+    borderBottomLeftRadius: 6,
   },
   bubbleUser: {
-    alignSelf: 'flex-end',
     backgroundColor: theme.colors.accent,
+    borderBottomRightRadius: 6,
+  },
+  thinkingBubble: {
+    paddingVertical: theme.spacing.sm + 2,
+    minWidth: 60,
   },
   bubbleText: {
     fontSize: 17,
@@ -202,6 +289,7 @@ const styles = StyleSheet.create({
   },
   bubbleTextUser: {
     color: '#fff',
+    fontWeight: '600',
   },
   errorBubble: {
     alignSelf: 'center',
@@ -215,6 +303,34 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  quickScroll: {
+    flexGrow: 0,
+  },
+  quickContent: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs,
+    gap: theme.spacing.sm,
+  },
+  quickChip: {
+    paddingHorizontal: theme.spacing.md,
+    paddingVertical: theme.spacing.xs + 2,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.radii.full,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+  },
+  quickPressed: {
+    opacity: 0.85,
+    transform: [{ scale: 0.97 }],
+  },
+  quickDisabled: {
+    opacity: 0.5,
+  },
+  quickChipText: {
+    fontSize: 13,
+    color: theme.colors.text,
+    fontWeight: '600',
+  },
   inputRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -223,7 +339,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.spacing.sm,
     backgroundColor: theme.colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: theme.colors.textMuted,
+    borderTopColor: theme.colors.border,
   },
   input: {
     flex: 1,

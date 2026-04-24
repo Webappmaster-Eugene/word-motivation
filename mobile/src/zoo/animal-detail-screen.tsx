@@ -28,6 +28,9 @@ import { navigateHome } from '@/shared/ui/nav';
 import { theme } from '@/shared/theme';
 
 import { useZooData } from './hooks/use-zoo-data';
+import { AnimalInteractionPanel } from './components/animal-interaction-panel';
+
+type ActiveTab = 'chat' | 'play';
 
 interface Props {
   readonly animalId: string;
@@ -116,6 +119,7 @@ export function AnimalDetailScreen({ animalId }: Props) {
     return null;
   }, [query.data, animalId]);
 
+  const [activeTab, setActiveTab] = useState<ActiveTab>('chat');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [history, setHistory] = useState<readonly ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
@@ -330,15 +334,53 @@ export function AnimalDetailScreen({ animalId }: Props) {
               </View>
             </View>
             <View style={styles.heroScene}>
-              <AnimalScene asset={asset} animation="greet" width={200} height={160} />
+              <AnimalScene
+                asset={asset}
+                animation="greet"
+                width={200}
+                height={160}
+                showTitle={false}
+              />
             </View>
             <Text style={[styles.heroTitle, { color: heroFg }]}>{animal.title}</Text>
             <Text style={[styles.heroSubtitle, { color: heroSecondaryFg }]}>
-              Задавай вопросы — отвечу, как смогу!
+              {activeTab === 'chat' ? 'Задавай вопросы — отвечу, как смогу!' : 'Нажимай кнопки и играй!'}
             </Text>
           </View>
 
-          <ScrollView
+          {/* Переключатель табов */}
+          <View style={styles.tabBar}>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityLabel="Чат с животным"
+              accessibilityState={{ selected: activeTab === 'chat' }}
+              onPress={() => setActiveTab('chat')}
+              style={[styles.tabBtn, activeTab === 'chat' && styles.tabBtnActive]}
+            >
+              <Text style={[styles.tabBtnText, activeTab === 'chat' && styles.tabBtnTextActive]}>
+                💬 Чат
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="tab"
+              accessibilityLabel="Играть с животным"
+              accessibilityState={{ selected: activeTab === 'play' }}
+              onPress={() => setActiveTab('play')}
+              style={[styles.tabBtn, activeTab === 'play' && styles.tabBtnActive]}
+            >
+              <Text style={[styles.tabBtnText, activeTab === 'play' && styles.tabBtnTextActive]}>
+                🎮 Играть
+              </Text>
+            </Pressable>
+          </View>
+
+          {activeTab === 'play' ? (
+            <AnimalInteractionPanel animal={animal} />
+          ) : null}
+
+          {activeTab === 'chat' ? (
+            <>
+            <ScrollView
             ref={scrollRef}
             style={styles.chat}
             contentContainerStyle={styles.chatContent}
@@ -458,6 +500,8 @@ export function AnimalDetailScreen({ animalId }: Props) {
               Голос на этом устройстве не поддерживается — пиши текстом или выбирай вопросы выше.
             </Text>
           ) : null}
+            </>
+          ) : null}
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -477,6 +521,32 @@ const styles = StyleSheet.create({
     maxWidth: 760,
     width: '100%',
     alignSelf: 'center',
+  },
+  tabBar: {
+    flexDirection: 'row',
+    marginHorizontal: theme.spacing.lg,
+    marginTop: theme.spacing.md,
+    borderRadius: theme.radii.full,
+    backgroundColor: theme.colors.surface,
+    padding: 4,
+    gap: 4,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: theme.spacing.sm,
+    borderRadius: theme.radii.full,
+    alignItems: 'center',
+  },
+  tabBtnActive: {
+    backgroundColor: theme.colors.accent,
+  },
+  tabBtnText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.textMuted,
+  },
+  tabBtnTextActive: {
+    color: '#fff',
   },
   hero: {
     paddingHorizontal: theme.spacing.lg,

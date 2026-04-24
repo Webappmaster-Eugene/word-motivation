@@ -19,12 +19,15 @@ import type { SpeechSynthesisService, TtsEvent, TtsSpeakOptions } from './types'
 const VOICE_PREFERENCES: ReadonlyArray<{ readonly pattern: RegExp; readonly bonus: number }> = [
   { pattern: /premium|enhanced/i, bonus: 40 },
   { pattern: /neural|natural/i, bonus: 30 },
-  { pattern: /google/i, bonus: 25 },
+  { pattern: /google/i, bonus: 35 },
   { pattern: /yandex|alice|alena/i, bonus: 22 },
   // Женский голос звучит мягче и роднее ребёнку.
-  { pattern: /female|women|ирина|milena|ksyusha|alena|elena|tatyana|анна/i, bonus: 15 },
-  // Явные «плохие» голоса — штрафуем.
-  { pattern: /desktop|espeak|dmitri/i, bonus: -20 },
+  { pattern: /female|women|ирина|milena|ksyusha|kseniya|alena|elena|tatyana|анна/i, bonus: 15 },
+  // Microsoft Desktop — роботизированный звук, характерный для Windows-браузеров.
+  // Штраф достаточно высок, чтобы любой Google/enhanced голос его вытеснил.
+  { pattern: /microsoft/i, bonus: -30 },
+  // Явно устаревшие движки.
+  { pattern: /desktop|espeak|dmitri/i, bonus: -25 },
 ];
 
 function scoreVoice(voice: Speech.Voice): number {
@@ -68,7 +71,10 @@ export class ExpoSpeechTts implements SpeechSynthesisService {
         language: opts.lang ?? 'ru-RU',
         rate: opts.rate ?? this.defaultRate,
         pitch: opts.pitch ?? this.defaultPitch,
-        voice: opts.voice ?? this.preferredVoiceId ?? undefined,
+        // opts.voice содержит Silero-идентификатор (kseniya, baya и т.д.), который
+        // не является валидным идентификатором системного голоса expo-speech.
+        // Всегда используем preferredVoiceId — лучший голос, найденный скорингом.
+        voice: this.preferredVoiceId ?? undefined,
         onDone: () => {
           this.emit({ type: 'end' });
           resolve();

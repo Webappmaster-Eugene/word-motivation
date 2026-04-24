@@ -3,7 +3,9 @@ import { Pressable, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { gameRegistry } from '@/games/registry';
+import { GameErrorBoundary } from '@/shared/screens/game-error-boundary';
 import { theme } from '@/shared/theme';
+import { navigateHome } from '@/shared/ui/nav';
 
 export default function GameHost() {
   const { gameId } = useLocalSearchParams<{ gameId: string }>();
@@ -24,7 +26,11 @@ export default function GameHost() {
   }
 
   const GameScreen = plugin.Screen;
-  return <GameScreen />;
+  return (
+    <GameErrorBoundary onReset={() => navigateHome(router)}>
+      <GameScreen />
+    </GameErrorBoundary>
+  );
 }
 
 const styles = StyleSheet.create({

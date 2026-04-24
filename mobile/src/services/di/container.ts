@@ -38,7 +38,7 @@ function pickSpeechSynthesis(
   if (env.ttsMode === 'native') return expoTts;
   return new ServerTts(apiClient, deviceAuth, {
     apiBaseUrl: env.apiBaseUrl,
-    defaultVoice: 'xenia',
+    defaultVoice: 'baya',
     fallback: expoTts,
   });
 }

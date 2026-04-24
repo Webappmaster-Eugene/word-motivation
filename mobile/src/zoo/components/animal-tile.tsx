@@ -10,9 +10,15 @@ interface AnimalTileProps {
   readonly onPress: () => void;
 }
 
+// Цвет фона для locked-плиток: чуть темнее чем theme.colors.border (#E8DCC5)
+// для лучшего контраста с текстом #4A4036. Предыдущий вариант с text=textMuted
+// (#6B6B6B) на #E8DCC5 давал контраст ~2.5:1 — ниже WCAG AA (4.5:1).
+const LOCKED_BG = '#D4C09A';
+const LOCKED_FG = '#4A4036';
+
 export function AnimalTile({ animal, onPress }: AnimalTileProps) {
   const locked = !animal.unlocked;
-  const fg = locked ? theme.colors.textMuted : contrastTextColor(animal.color);
+  const fg = locked ? LOCKED_FG : contrastTextColor(animal.color);
   return (
     <Pressable
       accessibilityRole="button"
@@ -25,12 +31,12 @@ export function AnimalTile({ animal, onPress }: AnimalTileProps) {
       disabled={locked}
       style={({ pressed }) => [
         styles.tile,
-        { backgroundColor: locked ? theme.colors.border : animal.color },
+        { backgroundColor: locked ? LOCKED_BG : animal.color },
         pressed && !locked && styles.pressed,
       ]}
     >
       <Text style={[styles.emoji, locked && styles.emojiLocked]}>
-        {locked ? '❓' : animal.emoji}
+        {locked ? '🔒' : animal.emoji}
       </Text>
       <Text
         style={[styles.title, { color: fg }, !locked && styles.titleShadow]}
@@ -69,7 +75,9 @@ const styles = StyleSheet.create({
     lineHeight: 62,
   },
   emojiLocked: {
-    opacity: 0.5,
+    opacity: 0.7,
+    fontSize: 40,
+    lineHeight: 48,
   },
   title: {
     fontSize: 14,

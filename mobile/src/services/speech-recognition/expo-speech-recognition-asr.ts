@@ -1,3 +1,6 @@
+import { AppState } from 'react-native';
+import type { AppStateStatus, NativeEventSubscription } from 'react-native';
+
 import type { AsrEvent, AsrStartOptions, SpeechRecognitionService } from './types';
 
 type Subscription = { remove: () => void };
@@ -13,11 +16,19 @@ type AddListenerType = typeof import('expo-speech-recognition')['addSpeechRecogn
  *
  * Модуль импортируется лениво через require — чтобы при web-бандлинге не тащить
  * native-код, который не исполнится.
+ *
+ * Дополнительные гарантии надёжности:
+ *  - maxDurationMs: клиентский таймер останавливает сессию, если Android-распознаватель
+ *    не завершился сам (стандартный timeout ~15 с > 5 с игрового пресета).
+ *  - AppState: при уходе в фон сессия прерывается — иначе микрофон продолжает
+ *    пишать аудио и нагружает память, что приводит к kill Activity.
  */
 export class ExpoSpeechRecognitionAsr implements SpeechRecognitionService {
   private readonly listeners = new Set<(event: AsrEvent) => void>();
   private subscriptions: Subscription[] = [];
   private running = false;
+  private durationTimer: ReturnType<typeof setTimeout> | null = null;
+  private appStateSubscription: NativeEventSubscription | null = null;
 
   private get module(): ExpoSpeechRecognitionModuleType {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -125,7 +136,28 @@ export class ExpoSpeechRecognitionAsr implements SpeechRecognitionService {
         type: 'error',
         message: err instanceof Error ? err.message : 'Не удалось запустить распознавание',
       });
+      return;
     }
+
+    // Клиентский таймаут: Android Speech Recognizer по умолчанию ждёт ~15 с,
+    // что слишком долго для детской игры (пресет 5 с). Останавливаем принудительно.
+    if (opts.maxDurationMs) {
+      this.durationTimer = setTimeout(() => {
+        if (this.running) void this.stop();
+      }, opts.maxDurationMs);
+    }
+
+    // При уходе приложения в фон останавливаем ASR: активный микрофон в фоне
+    // продолжает записывать аудио, нагружает память и может спровоцировать
+    // kill Activity на Android (что выглядит как «падение на главный экран»).
+    this.appStateSubscription = AppState.addEventListener(
+      'change',
+      (nextState: AppStateStatus) => {
+        if (nextState !== 'active' && this.running) {
+          void this.stop();
+        }
+      },
+    );
   }
 
   async stop(): Promise<void> {
@@ -147,6 +179,13 @@ export class ExpoSpeechRecognitionAsr implements SpeechRecognitionService {
   }
 
   private cleanup(): void {
+    if (this.durationTimer !== null) {
+      clearTimeout(this.durationTimer);
+      this.durationTimer = null;
+    }
+    this.appStateSubscription?.remove();
+    this.appStateSubscription = null;
+
     for (const s of this.subscriptions) {
       try {
         s.remove();

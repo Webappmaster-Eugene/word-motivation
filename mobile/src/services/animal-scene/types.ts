@@ -6,7 +6,13 @@
 
 export type AnimalId = string;
 
-export type SceneAnimation = 'idle' | 'greet' | 'dance' | 'sleep';
+/**
+ * Анимационные состояния сцены.
+ * Соответствует `AnimationClip` из `AnimalModelDescriptor` для Filament (M4.5).
+ *  - idle/greet/dance/sleep — «пассивные» (запускаются автоматически).
+ *  - happy/eat/play — «интерактивные» (запускаются по действию ребёнка).
+ */
+export type SceneAnimation = 'idle' | 'greet' | 'dance' | 'sleep' | 'happy' | 'eat' | 'play';
 
 export interface AnimalSceneAsset {
   readonly id: AnimalId;

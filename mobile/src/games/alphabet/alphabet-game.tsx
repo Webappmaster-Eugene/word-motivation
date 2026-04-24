@@ -425,6 +425,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: theme.spacing.lg,
     paddingVertical: theme.spacing.md,
+    // Привязываем header к той же ширине, что и body, чтобы «← Домой» и звёзды
+    // не висели в разных концах 1920-экрана, далеко от игрового контента.
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
   },
   back: {
     minWidth: 80,
@@ -444,6 +449,12 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     justifyContent: 'space-between',
+    // На десктопе сцена и кнопки не должны растягиваться на 1920px — ограничиваем
+    // max-width и центрируем. Мобильные устройства получают ту же ширину как
+    // раньше (content <= 720 всегда).
+    maxWidth: 720,
+    width: '100%',
+    alignSelf: 'center',
   },
   center: {
     flex: 1,
