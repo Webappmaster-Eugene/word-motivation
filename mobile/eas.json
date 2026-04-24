@@ -19,7 +19,7 @@
       "distribution": "internal",
       "env": {
         "APP_VARIANT": "preview",
-        "EXPO_PUBLIC_API_BASE_URL": "http://localhost:3000"
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.games.nadtocheev.ru"
       },
       "android": {
         "buildType": "apk"
@@ -27,6 +27,9 @@
     },
     "production": {
       "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.games.nadtocheev.ru"
+      },
       "android": {
         "buildType": "app-bundle"
       }
