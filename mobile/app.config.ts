@@ -61,14 +61,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     plugins: [
       'expo-router',
       'expo-secure-store',
-      [
-        'expo-build-properties',
-        {
-          android: {
-            kotlinVersion: '1.9.25',
-          },
-        },
-      ],
+      'expo-sqlite',
       [
         'expo-speech-recognition',
         {

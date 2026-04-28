@@ -7,7 +7,6 @@ type Subscription = { remove: () => void };
 
 type ExpoSpeechRecognitionApi = typeof import('expo-speech-recognition');
 type ExpoSpeechRecognitionModuleType = ExpoSpeechRecognitionApi['ExpoSpeechRecognitionModule'];
-type AddListenerFn = ExpoSpeechRecognitionApi['addSpeechRecognitionListener'];
 type NativeEventMap = import('expo-speech-recognition').ExpoSpeechRecognitionNativeEventMap;
 type NativeEvents = {
   [K in keyof NativeEventMap]: (event: NativeEventMap[K]) => void;
@@ -50,20 +49,17 @@ export class ExpoSpeechRecognitionAsr implements SpeechRecognitionService {
   private appStateSubscription: NativeEventSubscription | null = null;
 
   private readonly module: ExpoSpeechRecognitionModuleType | null;
-  private readonly addListenerFn: AddListenerFn | null;
   private readonly moduleLoadError: string | null;
 
   constructor() {
     let module: ExpoSpeechRecognitionModuleType | null = null;
-    let addListenerFn: AddListenerFn | null = null;
     let loadError: string | null = null;
 
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const lib = require('expo-speech-recognition') as ExpoSpeechRecognitionApi;
       module = lib.ExpoSpeechRecognitionModule ?? null;
-      addListenerFn = lib.addSpeechRecognitionListener ?? null;
-      if (!module || !addListenerFn) {
+      if (!module) {
         loadError = 'Модуль распознавания речи не подключён к нативной части приложения.';
       }
     } catch (err) {
@@ -74,7 +70,6 @@ export class ExpoSpeechRecognitionAsr implements SpeechRecognitionService {
     }
 
     this.module = module;
-    this.addListenerFn = addListenerFn;
     this.moduleLoadError = loadError;
   }
 
@@ -84,7 +79,7 @@ export class ExpoSpeechRecognitionAsr implements SpeechRecognitionService {
    * понятный «недоступно» вместо краша.
    */
   isModuleLoaded(): boolean {
-    return this.module !== null && this.addListenerFn !== null;
+    return this.module !== null;
   }
 
   async isAvailable(): Promise<boolean> {
@@ -98,7 +93,7 @@ export class ExpoSpeechRecognitionAsr implements SpeechRecognitionService {
 
   async start(opts: AsrStartOptions): Promise<void> {
     // [G1] Module guard
-    if (!this.module || !this.addListenerFn) {
+    if (!this.module) {
       this.emit({
         type: 'error',
         message: this.moduleLoadError ?? 'Распознавание речи недоступно.',
@@ -245,15 +240,15 @@ export class ExpoSpeechRecognitionAsr implements SpeechRecognitionService {
   }
 
   private attachListeners(): void {
-    const addListener = this.addListenerFn;
-    if (!addListener) return;
+    const module = this.module;
+    if (!module) return;
 
     const safeAdd = <K extends keyof NativeEventMap>(
       name: K,
       handler: NativeEvents[K],
     ): void => {
       try {
-        const sub = addListener(name, handler);
+        const sub = module.addListener(name, handler);
         if (sub && typeof sub.remove === 'function') {
           this.subscriptions.push(sub);
         }
