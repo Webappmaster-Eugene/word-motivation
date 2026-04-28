@@ -24,7 +24,7 @@ COPY package*.json ./
 # (без расширения) не резолвятся (ERR_MODULE_NOT_FOUND).
 COPY tsconfig.json ./
 # TTS-кеш: создаём директорию и даём права `app` пользователю ДО USER app.
-# Без этого docker-compose мontирует named volume `ninegames-tts-cache` в
+# Без этого docker-compose мontирует named volume `babyfunner-tts-cache` в
 # `/data/tts-cache` как owned by root, а наш NestJS бежит под `app` → падает
 # в TtsCacheService.onModuleInit() на попытке создать `.write-probe`. Dokploy
 # тогда показывает healthcheck failure без полезного контекста.

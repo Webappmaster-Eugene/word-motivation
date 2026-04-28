@@ -25,7 +25,7 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: ninegames-postgres
+    container_name: babyfunner-postgres
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
@@ -46,7 +46,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: ninegames-redis
+    container_name: babyfunner-redis
     restart: unless-stopped
     command:
       - redis-server
@@ -72,8 +72,8 @@ services:
     build:
       context: tts-worker
       dockerfile: Dockerfile
-    image: ninegames-tts-worker:${IMAGE_TAG:-latest}
-    container_name: ninegames-tts-worker
+    image: babyfunner-tts-worker:${IMAGE_TAG:-latest}
+    container_name: babyfunner-tts-worker
     restart: unless-stopped
     profiles: ["app"]
     environment:
@@ -102,8 +102,8 @@ services:
     build:
       context: server
       dockerfile: Dockerfile
-    image: ninegames-server:${IMAGE_TAG:-latest}
-    container_name: ninegames-server
+    image: babyfunner-server:${IMAGE_TAG:-latest}
+    container_name: babyfunner-server
     restart: unless-stopped
     profiles: ["app"]
     environment:
@@ -166,8 +166,8 @@ services:
     # Dokploy: Traefik автоматически настраивается через UI.
     # labels:
     #   - traefik.enable=true
-    #   - traefik.http.routers.ninegames-api.rule=Host(`api.example.com`)
-    #   - traefik.http.services.ninegames-api.loadbalancer.server.port=3000
+    #   - traefik.http.routers.babyfunner-api.rule=Host(`api.example.com`)
+    #   - traefik.http.services.babyfunner-api.loadbalancer.server.port=3000
 
   web:
     build:
@@ -175,8 +175,8 @@ services:
       dockerfile: Dockerfile.web
       args:
         EXPO_PUBLIC_API_BASE_URL: ${EXPO_PUBLIC_API_BASE_URL:-http://localhost:3000}
-    image: ninegames-web:${IMAGE_TAG:-latest}
-    container_name: ninegames-web
+    image: babyfunner-web:${IMAGE_TAG:-latest}
+    container_name: babyfunner-web
     restart: unless-stopped
     profiles: ["app"]
     depends_on:
@@ -196,8 +196,8 @@ services:
       - ninegames
     # labels:
     #   - traefik.enable=true
-    #   - traefik.http.routers.ninegames-web.rule=Host(`app.example.com`)
-    #   - traefik.http.services.ninegames-web.loadbalancer.server.port=80
+    #   - traefik.http.routers.babyfunner-web.rule=Host(`app.example.com`)
+    #   - traefik.http.services.babyfunner-web.loadbalancer.server.port=80
 
 volumes:
   ninegames-postgres-data:

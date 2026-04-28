@@ -1,5 +1,5 @@
 {
-  "name": "90games-root",
+  "name": "baby-funner-root",
   "version": "0.0.0",
   "private": true,
   "description": "Корневой package.json — только для dev-инструментов (lefthook). Не содержит рантайм-зависимостей приложения. Metro/Expo читают только mobile/node_modules, поэтому этот package.json их не затрагивает.",
@@ -12,6 +12,7 @@
     "tts:syntax": "python -c \"import ast; [ast.parse(open('tts-worker/' + f).read()) for f in ['main.py']]; print('tts-worker/*.py syntax OK')\""
   },
   "devDependencies": {
-    "lefthook": "^1.10.0"
+    "lefthook": "^1.10.0",
+    "sharp": "^0.34.5"
   }
 }

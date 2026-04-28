@@ -113,7 +113,7 @@ export function AboutScreen() {
 
         <Text style={styles.sectionHeading}>Благодарности</Text>
         <Text style={styles.intro}>
-          90.games — открытый учебный проект, использующий свободные библиотеки и ассеты.
+          Baby-funner — открытый учебный проект, использующий свободные библиотеки и ассеты.
           Благодарим авторов ниже за их труд.
         </Text>
         {CREDITS.map((c) => (

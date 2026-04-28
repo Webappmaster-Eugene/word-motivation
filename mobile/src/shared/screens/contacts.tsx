@@ -11,14 +11,13 @@ interface ContactLine {
   readonly href?: string;
 }
 
-const SUPPORT_EMAIL = 'support@90.games';
+const SUPPORT_EMAIL = 'support@nadtocheev.ru';
 const AUTHOR_URL = 'https://nadtocheev.ru';
 
 const LINES: readonly ContactLine[] = [
   { label: 'Поддержка', value: SUPPORT_EMAIL, href: `mailto:${SUPPORT_EMAIL}` },
   { label: 'Автор', value: 'Евгений Надточеев' },
   { label: 'Сайт автора', value: 'nadtocheev.ru', href: AUTHOR_URL },
-  { label: 'Исходники и issue-tracker', value: 'github.com/90games', href: 'https://github.com/90games' },
 ];
 
 function openLink(url: string): void {

@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { kvStorage } from '@/services/storage/kv-storage';
 import { theme } from '@/shared/theme';
 
-const CONSENT_KEY = 'ninegames.parent_consent.v1';
+const CONSENT_KEY = 'babyfunner.parent_consent.v1';
 
 interface ConsentState {
   readonly acceptedAt: string; // ISO

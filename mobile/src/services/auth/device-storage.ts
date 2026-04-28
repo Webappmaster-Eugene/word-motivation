@@ -15,7 +15,7 @@ export interface DeviceStorage {
   set(value: string): Promise<void>;
 }
 
-const DEVICE_ID_KEY = 'ninegames.device_id.v1';
+const DEVICE_ID_KEY = 'babyfunner.device_id.v1';
 
 let memoryFallback: string | null = null;
 

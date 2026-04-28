@@ -55,7 +55,7 @@ async function bootstrap(): Promise<void> {
 
   const logger = app.get(Logger);
   logger.log(
-    `Сервер 90games запущен на http://${host}:${port} (CORS: ${
+    `Сервер Baby-funner запущен на http://${host}:${port} (CORS: ${
       allowedOrigins.length === 0 ? 'все Origin-ы' : allowedOrigins.join(', ')
     })`,
   );

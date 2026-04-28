@@ -46,8 +46,8 @@ export class OpenRouterClient {
         'Content-Type': 'application/json',
         Accept: 'application/json',
         Authorization: `Bearer ${apiKey}`,
-        'HTTP-Referer': 'https://90games.app',
-        'X-Title': '90games',
+        'HTTP-Referer': 'https://babyfunner.app',
+        'X-Title': 'Baby-funner',
       },
       body: JSON.stringify({
         model,

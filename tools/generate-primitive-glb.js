@@ -87,7 +87,7 @@ function buildCubeGlb(rgba) {
   idxBytes.copy(binChunk, idxOffset);
 
   const gltf = {
-    asset: { version: '2.0', generator: '90games cube-generator' },
+    asset: { version: '2.0', generator: 'Baby-funner cube-generator' },
     scene: 0,
     scenes: [{ nodes: [0] }],
     nodes: [{ mesh: 0 }],

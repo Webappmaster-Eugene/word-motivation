@@ -8,7 +8,7 @@ export interface UnlockedAnimalRecord {
 
 type Snapshot = Readonly<Record<string, UnlockedAnimalRecord>>;
 
-const STORAGE_KEY = 'ninegames.unlocked-animals.v1';
+const STORAGE_KEY = 'babyfunner.unlocked-animals.v1';
 
 /**
  * Локальное хранилище открытых животных.

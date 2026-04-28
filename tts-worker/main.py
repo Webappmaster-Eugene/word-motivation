@@ -135,7 +135,7 @@ def samples_to_wav(samples: np.ndarray, sample_rate: int) -> bytes:
     return buffer.getvalue()
 
 
-app = FastAPI(title="90games TTS worker", docs_url=None, redoc_url=None)
+app = FastAPI(title="Baby-funner TTS worker", docs_url=None, redoc_url=None)
 engine = SileroEngine()
 
 

@@ -9,7 +9,7 @@ export interface LetterStats {
 
 export type LetterMasterySnapshot = Readonly<Record<string, LetterStats>>;
 
-const STORAGE_KEY = 'ninegames.mastery.letters.v1';
+const STORAGE_KEY = 'babyfunner.mastery.letters.v1';
 
 /**
  * Хранит статистику по буквам для spaced repetition-лайт.

@@ -18,13 +18,13 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
   return {
     ...config,
-    name: `90games${nameSuffix}`,
-    slug: 'ninegames',
+    name: `Baby-funner${nameSuffix}`,
+    slug: 'baby-funner',
     version: '0.0.1',
     orientation: 'portrait',
     userInterfaceStyle: 'automatic',
     newArchEnabled: true,
-    scheme: 'ninegames',
+    scheme: 'babyfunner',
     icon: './assets/images/icon.png',
     splash: {
       image: './assets/images/splash.png',
@@ -37,15 +37,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       bundler: 'metro',
       output: 'single',
       favicon: './assets/images/favicon.png',
-      name: '90games',
-      shortName: '90games',
+      name: 'Baby-funner',
+      shortName: 'Baby-funner',
       backgroundColor: '#FFF4E0',
       themeColor: '#FF7A59',
       lang: 'ru',
-      description: 'Обучающие игры для детей 6–12 лет',
+      description: 'Baby-funner — обучающие игры для детей 6–12 лет',
     },
     android: {
-      package: `ru.ninegames.app${packageSuffix}`,
+      package: `ru.babyfunner.app${packageSuffix}`,
       versionCode: 1,
       adaptiveIcon: {
         foregroundImage: './assets/images/adaptive-icon.png',

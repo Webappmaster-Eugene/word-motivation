@@ -1,8 +1,8 @@
 {
-  "name": "ninegames-server",
+  "name": "baby-funner-server",
   "version": "0.0.1",
   "private": true,
-  "description": "NestJS backend для 90.games — контент, прогресс, AI-прокси к OpenRouter",
+  "description": "NestJS backend для Baby-funner — контент, прогресс, AI-прокси к OpenRouter",
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
