@@ -16,7 +16,7 @@ const AUTHOR_URL = 'https://nadtocheev.ru';
 
 const LINES: readonly ContactLine[] = [
   { label: 'Поддержка', value: SUPPORT_EMAIL, href: `mailto:${SUPPORT_EMAIL}` },
-  { label: 'Автор', value: 'Иван Надточеев' },
+  { label: 'Автор', value: 'Евгений Надточеев' },
   { label: 'Сайт автора', value: 'nadtocheev.ru', href: AUTHOR_URL },
   { label: 'Исходники и issue-tracker', value: 'github.com/90games', href: 'https://github.com/90games' },
 ];
@@ -72,7 +72,7 @@ export function ContactsScreen() {
         <View style={styles.block}>
           <Text style={styles.blockTitle}>Реквизиты для оферты</Text>
           <Text style={styles.blockBody}>
-            Физическое лицо: Иван Надточеев. Все юридические документы — в разделе «Настройки».
+            Физическое лицо: Евгений Надточеев. Все юридические документы — в разделе «Настройки».
           </Text>
         </View>
 

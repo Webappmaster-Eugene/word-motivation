@@ -64,7 +64,7 @@ const SECTIONS: readonly LegalSection[] = [
   },
   {
     title: '9. Контакты',
-    body: 'Правообладатель: Иван Надточеев, nadtocheev.ru. По всем вопросам: support@90.games.',
+    body: 'Правообладатель: Евгений Надточеев, nadtocheev.ru. По всем вопросам: support@90.games.',
   },
 ];
 

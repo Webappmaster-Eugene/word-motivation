@@ -48,13 +48,26 @@ function pickSpeechRecognition(): SpeechRecognitionService {
     return WebSpeechAsr.isSupported() ? new WebSpeechAsr() : new StubAsr();
   }
   // Native (Android/iOS): expo-speech-recognition. Лениво импортируем,
-  // чтобы при web-сборке не тянуть native-модуль.
+  // чтобы при web-сборке не тянуть native-модуль. Дополнительно — sync-проверка
+  // через ducktype `isModuleLoaded`: если native-часть не залинкована (dev-client
+  // без перебилда после установки пакета), отдаём StubAsr — иначе при первом
+  // обращении к микрофону получим JSI-краш.
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { ExpoSpeechRecognitionAsr } = require('@/services/speech-recognition/expo-speech-recognition-asr') as {
-      ExpoSpeechRecognitionAsr: new () => SpeechRecognitionService;
+      ExpoSpeechRecognitionAsr: new () => SpeechRecognitionService & {
+        isModuleLoaded?: () => boolean;
+      };
     };
-    return new ExpoSpeechRecognitionAsr();
+    const candidate = new ExpoSpeechRecognitionAsr();
+    if (typeof candidate.isModuleLoaded === 'function' && !candidate.isModuleLoaded()) {
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.warn('expo-speech-recognition модуль не загрузился, fallback на StubAsr');
+      }
+      return new StubAsr();
+    }
+    return candidate;
   } catch (err) {
     if (__DEV__) {
       // eslint-disable-next-line no-console

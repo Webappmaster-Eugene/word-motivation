@@ -96,7 +96,7 @@ export function AboutScreen() {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.authorCard}>
           <Text style={styles.authorLabel}>АВТОР</Text>
-          <Text style={styles.authorName}>Иван Надточеев</Text>
+          <Text style={styles.authorName}>Евгений Надточеев</Text>
           <Text style={styles.authorBio}>
             Создаю обучающие игры и инструменты для детей и взрослых. Если нашли баг
             или хотите предложить новую игру — пишите.

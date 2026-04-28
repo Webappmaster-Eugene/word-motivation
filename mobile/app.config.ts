@@ -76,7 +76,17 @@ export default ({ config }: ConfigContext): ExpoConfig => {
             'Голосовой ввод нужен, чтобы ребёнок мог называть буквы и разговаривать с животными. Голос обрабатывается только на устройстве.',
           speechRecognitionPermission:
             'Для распознавания речи используется встроенный сервис Android — ничего не отправляется на сервер.',
-          androidSpeechServicePackages: ['com.google.android.googlequicksearchbox'],
+          // <queries>-декларации в AndroidManifest для package-visibility (Android 11+).
+          // Расширенный список покрывает не только Pixel/Google-устройства, но и MIUI/HyperOS
+          // (Xiaomi/POCO) и Samsung Bixby — без явной декларации Android не разрешит
+          // приложению даже видеть, что соответствующий recognition-сервис установлен,
+          // и `getSpeechRecognitionServices()` вернёт пустой массив.
+          androidSpeechServicePackages: [
+            'com.google.android.googlequicksearchbox',
+            'com.google.android.as',
+            'com.samsung.android.bixby.agent',
+            'com.miui.voiceassist',
+          ],
         },
       ],
       [
