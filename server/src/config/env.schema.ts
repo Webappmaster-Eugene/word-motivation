@@ -57,9 +57,7 @@ export const envSchema = z.object({
   TTS_WORKER_URL: z.string().url().default('http://tts-worker:5000'),
   TTS_CACHE_DIR: z.string().default('/data/tts-cache'),
   TTS_MAX_CACHE_MB: z.coerce.number().int().positive().max(10_000).default(512),
-  TTS_DEFAULT_VOICE: z
-    .enum(['xenia', 'kseniya', 'baya', 'aidar', 'eugene'])
-    .default('baya'),
+  TTS_DEFAULT_VOICE: z.enum(['xenia', 'kseniya', 'baya', 'aidar', 'eugene']).default('baya'),
   TTS_REQUEST_TIMEOUT_MS: z.coerce.number().int().positive().default(15_000),
   TTS_RATE_LIMIT_PER_MIN: z.coerce.number().int().positive().default(60),
 });

@@ -53,7 +53,9 @@ export class ProgressService {
       where: { id: input.sessionId },
       data: {
         endedAt: new Date(),
-        ...(input.summaryStats ? { summaryStats: input.summaryStats as Prisma.InputJsonValue } : {}),
+        ...(input.summaryStats
+          ? { summaryStats: input.summaryStats as Prisma.InputJsonValue }
+          : {}),
         ...(input.fsmSnapshot !== undefined
           ? { fsmSnapshot: input.fsmSnapshot as Prisma.InputJsonValue }
           : {}),

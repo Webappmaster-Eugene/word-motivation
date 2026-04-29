@@ -16,19 +16,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimalScene } from '@/games/alphabet/components/animal-scene';
 import { MicButton } from '@/games/alphabet/components/mic-button';
 import { TypingIndicator } from '@/games/alphabet/components/typing-indicator';
-import { useVoiceInput } from '@/games/alphabet/hooks/use-voice-input';
 import type { AnimalInfo } from '@/games/alphabet/content/types';
+import { useVoiceInput } from '@/games/alphabet/hooks/use-voice-input';
 import type { AnimalSceneAsset } from '@/services/animal-scene/types';
 import { useService } from '@/services/di/provider';
 import type { ChatHistoryEntry } from '@/services/llm-chat/llm-chat';
 import { SPEECH_PRESETS } from '@/services/speech-synthesis/types';
 import { sanitizeUserMessage } from '@/shared/client-moderation';
+import { theme } from '@/shared/theme';
 import { contrastSecondaryColor, contrastTextColor } from '@/shared/theme/contrast';
 import { navigateHome } from '@/shared/ui/nav';
-import { theme } from '@/shared/theme';
 
-import { useZooData } from './hooks/use-zoo-data';
 import { AnimalInteractionPanel } from './components/animal-interaction-panel';
+import { useZooData } from './hooks/use-zoo-data';
 
 type ActiveTab = 'chat' | 'play';
 
@@ -239,7 +239,7 @@ export function AnimalDetailScreen({ animalId }: Props) {
         ]);
         speakReply(scripted);
         if (__DEV__) {
-          // eslint-disable-next-line no-console
+           
           console.warn('LLM недоступен, scripted fallback:', err);
         }
       } finally {

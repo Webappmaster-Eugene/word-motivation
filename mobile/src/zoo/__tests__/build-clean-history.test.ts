@@ -11,11 +11,11 @@ interface ChatMessage {
 }
 
 // Копия логики из animal-detail-screen.tsx — если там меняется, здесь тоже.
-function buildCleanHistory(messages: readonly ChatMessage[]): Array<{
+function buildCleanHistory(messages: readonly ChatMessage[]): {
   role: Role;
   content: string;
-}> {
-  const out: Array<{ role: Role; content: string }> = [];
+}[] {
+  const out: { role: Role; content: string }[] = [];
   for (let i = 0; i < messages.length; i += 1) {
     const m = messages[i]!;
     if (m.sanitized) {

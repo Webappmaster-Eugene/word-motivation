@@ -1,9 +1,8 @@
 import { useMachine } from '@xstate/react';
 import { useEffect, useMemo } from 'react';
-import { Platform } from 'react-native';
 
-import { useService } from '@/services/di/provider';
 import type { AlphabetContent } from '@/services/content-repo/types';
+import { useService } from '@/services/di/provider';
 import { SPEECH_PRESETS } from '@/services/speech-synthesis/types';
 
 import type { AnimalInfo, WordEntry } from '../content/types';
@@ -137,9 +136,10 @@ export function useAlphabetMachine({
 
     return () => {
       cancelled = true;
-      if (Platform.OS !== 'web') {
-        void tts.cancel();
-      }
+      // Отменяем озвучку и на native, и на web: при unmount/быстром
+      // переключении игр незакрытый speechSynthesis оставляет фон-речь
+      // в браузере и блокирует следующий вызов speak().
+      void tts.cancel();
     };
   }, [state.value, state.context.mode, letter, word, animal, tts, send]);
 

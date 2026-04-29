@@ -33,7 +33,7 @@ export class GameErrorBoundary extends React.Component<Props, State> {
 
   componentDidCatch(error: unknown, info: React.ErrorInfo): void {
     if (__DEV__) {
-      // eslint-disable-next-line no-console
+       
       console.error('GameErrorBoundary поймал ошибку:', error, info.componentStack);
     }
   }

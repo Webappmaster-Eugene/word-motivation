@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo } from 'react';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -27,11 +27,27 @@ const AnimatedView = Animated.createAnimatedComponent(View);
  * MicButton с 3 пульсирующими кольцами при записи, staggered-анимация,
  * показывает transcript ТОЛЬКО если в нём нет мата (через client-moderation).
  */
+const BASE_SIZE = 84;
+const REFERENCE_WIDTH = 400;
+const MIN_SCALE = 0.85;
+const MAX_SCALE = 1.45;
+
 export function MicButton({ state, onPress, transcript }: MicButtonProps) {
   const ring0 = useSharedValue(0);
   const ring1 = useSharedValue(0);
   const ring2 = useSharedValue(0);
   const buttonScale = useSharedValue(1);
+  const { width: screenWidth } = useWindowDimensions();
+  const sizes = useMemo(() => {
+    const scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, screenWidth / REFERENCE_WIDTH));
+    const size = Math.round(BASE_SIZE * scale);
+    return {
+      size,
+      ringSize: size + 16,
+      iconFont: Math.round(36 * scale),
+      iconLine: Math.round(40 * scale),
+    };
+  }, [screenWidth]);
 
   useEffect(() => {
     const rings = [ring0, ring1, ring2];
@@ -107,11 +123,36 @@ export function MicButton({ state, onPress, transcript }: MicButtonProps) {
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.ringSlot}>
-        <AnimatedView style={[styles.ring, ring0Style]} pointerEvents="none" />
-        <AnimatedView style={[styles.ring, ring1Style]} pointerEvents="none" />
-        <AnimatedView style={[styles.ring, ring2Style]} pointerEvents="none" />
-        <AnimatedView style={[styles.buttonWrap, buttonStyle]}>
+      <View
+        style={[styles.ringSlot, { width: sizes.ringSize, height: sizes.ringSize }]}
+      >
+        <AnimatedView
+          style={[
+            styles.ring,
+            { width: sizes.size, height: sizes.size, borderRadius: sizes.size / 2 },
+            ring0Style,
+          ]}
+          pointerEvents="none"
+        />
+        <AnimatedView
+          style={[
+            styles.ring,
+            { width: sizes.size, height: sizes.size, borderRadius: sizes.size / 2 },
+            ring1Style,
+          ]}
+          pointerEvents="none"
+        />
+        <AnimatedView
+          style={[
+            styles.ring,
+            { width: sizes.size, height: sizes.size, borderRadius: sizes.size / 2 },
+            ring2Style,
+          ]}
+          pointerEvents="none"
+        />
+        <AnimatedView
+          style={[styles.buttonWrap, { width: sizes.size, height: sizes.size }, buttonStyle]}
+        >
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={state === 'listening' ? 'Остановить запись' : 'Начать запись'}
@@ -119,12 +160,15 @@ export function MicButton({ state, onPress, transcript }: MicButtonProps) {
             onPress={onPress}
             style={({ pressed }) => [
               styles.button,
+              { width: sizes.size, height: sizes.size, borderRadius: sizes.size / 2 },
               state === 'listening' && styles.buttonActive,
               state === 'unavailable' && styles.buttonDisabled,
               pressed && !disabled && styles.buttonPressed,
             ]}
           >
-            <Text style={styles.icon}>🎙️</Text>
+            <Text style={[styles.icon, { fontSize: sizes.iconFont, lineHeight: sizes.iconLine }]}>
+              🎙️
+            </Text>
           </Pressable>
         </AnimatedView>
       </View>
@@ -138,9 +182,6 @@ export function MicButton({ state, onPress, transcript }: MicButtonProps) {
   );
 }
 
-const SIZE = 84;
-const RING_SIZE = SIZE + 16;
-
 const styles = StyleSheet.create({
   wrap: {
     alignItems: 'center',
@@ -149,30 +190,20 @@ const styles = StyleSheet.create({
     minHeight: 150,
   },
   ringSlot: {
-    width: RING_SIZE,
-    height: RING_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   ring: {
     position: 'absolute',
-    width: SIZE,
-    height: SIZE,
-    borderRadius: SIZE / 2,
     backgroundColor: theme.colors.accent,
   },
   buttonWrap: {
     position: 'absolute',
-    width: SIZE,
-    height: SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
   button: {
-    width: SIZE,
-    height: SIZE,
-    borderRadius: SIZE / 2,
     backgroundColor: theme.colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
@@ -193,8 +224,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
   },
   icon: {
-    fontSize: 36,
-    lineHeight: 40,
+    // fontSize/lineHeight задаются динамически от ширины экрана
   },
   label: {
     marginTop: theme.spacing.sm,

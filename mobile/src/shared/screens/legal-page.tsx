@@ -3,8 +3,8 @@ import type { ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { navigateHome } from '@/shared/ui/nav';
 import { theme } from '@/shared/theme';
+import { navigateHome } from '@/shared/ui/nav';
 
 export interface LegalSection {
   readonly title: string;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -77,10 +77,11 @@ function AnimatedLetter({
 }
 
 export function WordReveal({ letters, highlightIndex, onTap, hint }: WordRevealProps) {
-  const fontSize = useMemo(() => {
-    const screenWidth = Dimensions.get('window').width;
-    return computeLetterSize(letters.length, screenWidth - HORIZONTAL_PADDING);
-  }, [letters.length]);
+  const { width: screenWidth } = useWindowDimensions();
+  const fontSize = useMemo(
+    () => computeLetterSize(letters.length, screenWidth - HORIZONTAL_PADDING),
+    [letters.length, screenWidth],
+  );
 
   return (
     <Pressable

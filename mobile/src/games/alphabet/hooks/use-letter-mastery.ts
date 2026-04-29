@@ -47,7 +47,7 @@ export function useLetterMastery(words: readonly WordEntry[]): UseLetterMasteryR
   const recordLetter = (letter: string, correct: boolean): void => {
     repo.record(letter, correct).catch((err) => {
       if (__DEV__) {
-        // eslint-disable-next-line no-console
+         
         console.warn('LetterMastery.record упал:', err);
       }
     });

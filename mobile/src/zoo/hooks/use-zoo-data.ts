@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
+import type { AnimalInfo, Biome } from '@/games/alphabet/content/types';
 import { useService } from '@/services/di/provider';
 
-import type { AnimalInfo, Biome } from '@/games/alphabet/content/types';
 
 export interface ZooAnimal extends AnimalInfo {
   readonly unlocked: boolean;

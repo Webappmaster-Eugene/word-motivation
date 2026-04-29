@@ -1,13 +1,13 @@
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useService } from '@/services/di/provider';
 import type { AlphabetContent } from '@/services/content-repo/types';
-import { navigateHome } from '@/shared/ui/nav';
+import { useService } from '@/services/di/provider';
 import { theme } from '@/shared/theme';
+import { navigateHome } from '@/shared/ui/nav';
 
 import { ActionBar } from './components/action-bar';
 import { AnimalRevealCard } from './components/animal-reveal-card';
@@ -78,12 +78,16 @@ export function AlphabetGame({
 
   // Подсовываем FSM упорядоченный по mastery список, чтобы первыми шли слова
   // со сложными буквами. Пока не загрузили snapshot — используем обычный порядок.
-  const orderedContent = useRef(content);
-  orderedContent.current = mastery.loaded ? { ...content, words: mastery.ordered } : content;
+  // useMemo, а не useRef-перезапись — иначе `content` для FSM получает новую
+  // ссылку на каждый рендер, и хук может пересоздавать машину впустую.
+  const orderedContent = useMemo(
+    () => (mastery.loaded ? { ...content, words: mastery.ordered } : content),
+    [content, mastery.loaded, mastery.ordered],
+  );
 
   const { state, send, word, letter, animal, mode, letterIndex, letterRetries, wordRetries } =
     useAlphabetMachine({
-      content: orderedContent.current,
+      content: orderedContent,
       initialWordIndex,
       initialTotalStars,
     });

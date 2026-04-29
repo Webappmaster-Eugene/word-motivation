@@ -53,7 +53,7 @@ function pickSpeechRecognition(): SpeechRecognitionService {
   // без перебилда после установки пакета), отдаём StubAsr — иначе при первом
   // обращении к микрофону получим JSI-краш.
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+     
     const { ExpoSpeechRecognitionAsr } = require('@/services/speech-recognition/expo-speech-recognition-asr') as {
       ExpoSpeechRecognitionAsr: new () => SpeechRecognitionService & {
         isModuleLoaded?: () => boolean;
@@ -62,7 +62,7 @@ function pickSpeechRecognition(): SpeechRecognitionService {
     const candidate = new ExpoSpeechRecognitionAsr();
     if (typeof candidate.isModuleLoaded === 'function' && !candidate.isModuleLoaded()) {
       if (__DEV__) {
-        // eslint-disable-next-line no-console
+         
         console.warn('expo-speech-recognition модуль не загрузился, fallback на StubAsr');
       }
       return new StubAsr();
@@ -70,7 +70,7 @@ function pickSpeechRecognition(): SpeechRecognitionService {
     return candidate;
   } catch (err) {
     if (__DEV__) {
-      // eslint-disable-next-line no-console
+       
       console.warn('expo-speech-recognition не установлен, падаем на stub:', err);
     }
     return new StubAsr();
@@ -84,7 +84,7 @@ export function createServiceBundle(): ServiceBundle {
   const localRepo = new LocalContentRepo();
   const contentRepo = new ResilientContentRepo(backendRepo, localRepo, (err) => {
     if (__DEV__) {
-      // eslint-disable-next-line no-console
+       
       console.warn('Контент берём из локального фолбэка:', err);
     }
   });

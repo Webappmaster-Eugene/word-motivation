@@ -8,11 +8,11 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import type { AnimalInfo } from '@/games/alphabet/content/types';
 import { AnimalScene } from '@/games/alphabet/components/animal-scene';
-import type { AnimalSceneAsset, SceneAnimation } from '@/services/animal-scene/types';
+import type { AnimalInfo } from '@/games/alphabet/content/types';
 import { StaticAnimalModelRegistry } from '@/services/animal-model/static-registry';
 import type { ModelInteraction } from '@/services/animal-model/types';
+import type { AnimalSceneAsset, SceneAnimation } from '@/services/animal-scene/types';
 import { useService } from '@/services/di/provider';
 import { SPEECH_PRESETS } from '@/services/speech-synthesis/types';
 import { theme } from '@/shared/theme';
@@ -64,10 +64,14 @@ export function AnimalInteractionPanel({ animal }: AnimalInteractionPanelProps) 
   const reactionOpacity = useSharedValue(0);
   const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  // Очищаем таймеры при unmount.
+  // Очищаем таймеры при unmount. Копируем `timersRef.current` в локальную
+  // переменную внутри эффекта: к моменту запуска cleanup ref может уже
+  // указывать на другой массив (если бы мы его пересоздавали), а мы хотим
+  // погасить именно те таймеры, что были живы на момент монтирования.
   useEffect(() => {
+    const timers = timersRef.current;
     return () => {
-      for (const t of timersRef.current) clearTimeout(t);
+      for (const t of timers) clearTimeout(t);
     };
   }, []);
 

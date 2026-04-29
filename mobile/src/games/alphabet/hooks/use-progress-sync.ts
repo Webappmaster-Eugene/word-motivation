@@ -68,7 +68,7 @@ export function useProgressSync({
       })
       .catch((err) => {
         if (__DEV__) {
-          // eslint-disable-next-line no-console
+           
           console.warn('progress.startSession упал, играем оффлайн:', err);
         }
       });
@@ -134,7 +134,7 @@ export function useProgressSync({
     });
     progress.unlockAnimal(animalId).catch((err) => {
       if (__DEV__) {
-        // eslint-disable-next-line no-console
+         
         console.warn('progress.unlockAnimal упал (local-unlock сохранён):', err);
       }
     });

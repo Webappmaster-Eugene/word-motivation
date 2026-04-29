@@ -25,14 +25,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const request = ctx.getRequest<{ url?: string }>();
 
     const status =
-      exception instanceof HttpException
-        ? exception.getStatus()
-        : HttpStatus.INTERNAL_SERVER_ERROR;
+      exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
 
     const message = this.extractMessage(exception);
 
     if (status >= 500) {
-      this.logger.error(`[${status}] ${message}`, exception instanceof Error ? exception.stack : undefined);
+      this.logger.error(
+        `[${status}] ${message}`,
+        exception instanceof Error ? exception.stack : undefined,
+      );
     } else {
       this.logger.warn(`[${status}] ${message}`);
     }

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -20,9 +20,24 @@ interface LetterCardProps {
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
+const BASE_CARD_WIDTH = 240;
+const BASE_CARD_HEIGHT = 280;
+const BASE_LETTER_FONT = 180;
+const MIN_CARD_WIDTH = 180;
+const MAX_CARD_WIDTH = 320;
+const HORIZONTAL_PADDING = 64;
+
 export function LetterCard({ letter, onTap, highlighted = false, disabled = false }: LetterCardProps) {
   const opacity = useSharedValue(0);
   const scale = useSharedValue(0.8);
+  const { width: screenWidth } = useWindowDimensions();
+  const cardWidth = Math.max(
+    MIN_CARD_WIDTH,
+    Math.min(MAX_CARD_WIDTH, screenWidth - HORIZONTAL_PADDING),
+  );
+  const cardHeight = Math.round((cardWidth / BASE_CARD_WIDTH) * BASE_CARD_HEIGHT);
+  const letterFont = Math.round((cardWidth / BASE_CARD_WIDTH) * BASE_LETTER_FONT);
+  const letterLine = Math.round(letterFont * 1.11);
 
   useEffect(() => {
     opacity.value = 0;
@@ -51,12 +66,19 @@ export function LetterCard({ letter, onTap, highlighted = false, disabled = fals
         disabled={disabled}
         style={({ pressed }) => [
           styles.card,
+          { width: cardWidth, height: cardHeight },
           highlighted && styles.cardHighlighted,
           pressed && !disabled && styles.cardPressed,
           disabled && styles.cardDisabled,
         ]}
       >
-        <Text style={[styles.letter, highlighted && styles.letterHighlighted]}>
+        <Text
+          style={[
+            styles.letter,
+            { fontSize: letterFont, lineHeight: letterLine },
+            highlighted && styles.letterHighlighted,
+          ]}
+        >
           {letter.toUpperCase()}
         </Text>
         <Text style={styles.letterSmall}>{letter.toLowerCase()}</Text>
@@ -71,8 +93,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   card: {
-    width: 240,
-    height: 280,
     borderRadius: theme.radii.lg,
     backgroundColor: theme.colors.surface,
     alignItems: 'center',
@@ -98,10 +118,8 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   letter: {
-    fontSize: 180,
     fontWeight: '800',
     color: theme.colors.text,
-    lineHeight: 200,
   },
   letterHighlighted: {
     color: theme.colors.accent,

@@ -3,8 +3,8 @@
  * Мокаем `SpeechRecognition` ctor как простой event-bus.
  */
 
-import { WebSpeechAsr } from '../web-speech-asr';
 import type { AsrEvent } from '../types';
+import { WebSpeechAsr } from '../web-speech-asr';
 
 interface MockResult {
   readonly transcript: string;

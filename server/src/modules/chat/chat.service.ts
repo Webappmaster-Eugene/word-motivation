@@ -46,7 +46,11 @@ export class ChatService {
       const scriptedReply = await this.fallbackReply(input.animalId, input.history.length);
       await this.logMessage(input, 'USER', input.userText, inputCheck.flags);
       await this.logMessage(input, 'ASSISTANT', scriptedReply, ['filtered-input']);
-      return { reply: scriptedReply, source: 'moderation-blocked', moderationFlags: inputCheck.flags };
+      return {
+        reply: scriptedReply,
+        source: 'moderation-blocked',
+        moderationFlags: inputCheck.flags,
+      };
     }
 
     const animal = await this.prisma.contentAnimal.findUnique({ where: { id: input.animalId } });
@@ -117,7 +121,9 @@ export class ChatService {
     const animal = await this.prisma.contentAnimal.findUnique({ where: { id: animalId } });
     if (!animal) return 'Давай поиграем!';
     const replies = Array.isArray(animal.scriptedReplies)
-      ? (animal.scriptedReplies.filter((s): s is string => typeof s === 'string') as readonly string[])
+      ? (animal.scriptedReplies.filter(
+          (s): s is string => typeof s === 'string',
+        ) as readonly string[])
       : [];
     if (replies.length === 0) return `Привет! Я ${animal.title}.`;
     if (replies.length === 1) return replies[0]!;
@@ -161,7 +167,9 @@ export class ChatService {
         },
       });
     } catch (err) {
-      this.logger.warn(`Не удалось залогировать сообщение чата: ${err instanceof Error ? err.message : err}`);
+      this.logger.warn(
+        `Не удалось залогировать сообщение чата: ${err instanceof Error ? err.message : err}`,
+      );
     }
   }
 }

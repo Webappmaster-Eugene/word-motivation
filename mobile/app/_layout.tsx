@@ -6,8 +6,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { ServicesProvider } from '@/services/di/provider';
-import { GameErrorBoundary } from '@/shared/screens/game-error-boundary';
 import { ConsentGate } from '@/shared/screens/consent-gate';
+import { GameErrorBoundary } from '@/shared/screens/game-error-boundary';
 import { navigateHome } from '@/shared/ui/nav';
 
 /**

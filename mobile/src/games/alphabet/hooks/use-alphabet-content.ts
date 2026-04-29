@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { useService } from '@/services/di/provider';
 import type { AlphabetContent } from '@/services/content-repo/types';
+import { useService } from '@/services/di/provider';
 
 /**
  * React Query хук для загрузки контента игры.

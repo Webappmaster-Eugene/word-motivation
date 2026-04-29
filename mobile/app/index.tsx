@@ -3,8 +3,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { gameRegistry } from '@/games/registry';
-import { DailyQuestCard } from '@/shared/ui/daily-quest-card';
 import { theme } from '@/shared/theme';
+import { DailyQuestCard } from '@/shared/ui/daily-quest-card';
 
 /**
  * Hub — главный экран: плитки игр + Зоопарк (коллекция открытых животных)

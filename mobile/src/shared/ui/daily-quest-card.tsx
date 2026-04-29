@@ -4,8 +4,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useAlphabetContent } from '@/games/alphabet/hooks/use-alphabet-content';
 import { pickDailyAnimal, todayIsoDate } from '@/services/daily-quest/daily-quest';
-import { contrastSecondaryColor, contrastTextColor } from '@/shared/theme/contrast';
 import { theme } from '@/shared/theme';
+import { contrastSecondaryColor, contrastTextColor } from '@/shared/theme/contrast';
 
 /**
  * Мини-карточка «Сегодняшнее животное» для хаба.

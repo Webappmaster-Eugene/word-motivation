@@ -60,9 +60,7 @@ export class TtsCacheService implements OnModuleInit {
    */
   private usable = false;
 
-  constructor(
-    private readonly config: ConfigService<AppConfig, true>,
-  ) {
+  constructor(private readonly config: ConfigService<AppConfig, true>) {
     this.cacheDir = this.config.get('TTS_CACHE_DIR', { infer: true });
     const mb = this.config.get('TTS_MAX_CACHE_MB', { infer: true });
     this.maxBytes = mb * 1024 * 1024;
@@ -226,9 +224,7 @@ export class TtsCacheService implements OnModuleInit {
     }
   }
 
-  private async listCacheFiles(): Promise<
-    Array<{ path: string; size: number; mtimeMs: number }>
-  > {
+  private async listCacheFiles(): Promise<Array<{ path: string; size: number; mtimeMs: number }>> {
     const entries = await fs.readdir(this.cacheDir, { withFileTypes: true });
     const results: Array<{ path: string; size: number; mtimeMs: number }> = [];
     for (const e of entries) {

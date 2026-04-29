@@ -68,8 +68,10 @@ describe('AuthService', () => {
     await service.registerDevice('same-device-id');
     await service.registerDevice('same-device-id');
 
-    const hash1 = (upsert.mock.calls[0]![0] as { where: { deviceIdHash: string } }).where.deviceIdHash;
-    const hash2 = (upsert.mock.calls[1]![0] as { where: { deviceIdHash: string } }).where.deviceIdHash;
+    const hash1 = (upsert.mock.calls[0]![0] as { where: { deviceIdHash: string } }).where
+      .deviceIdHash;
+    const hash2 = (upsert.mock.calls[1]![0] as { where: { deviceIdHash: string } }).where
+      .deviceIdHash;
     expect(hash1).toBe(hash2);
   });
 
@@ -80,8 +82,10 @@ describe('AuthService', () => {
     await service.registerDevice('device-one-1111');
     await service.registerDevice('device-two-2222');
 
-    const hash1 = (upsert.mock.calls[0]![0] as { where: { deviceIdHash: string } }).where.deviceIdHash;
-    const hash2 = (upsert.mock.calls[1]![0] as { where: { deviceIdHash: string } }).where.deviceIdHash;
+    const hash1 = (upsert.mock.calls[0]![0] as { where: { deviceIdHash: string } }).where
+      .deviceIdHash;
+    const hash2 = (upsert.mock.calls[1]![0] as { where: { deviceIdHash: string } }).where
+      .deviceIdHash;
     expect(hash1).not.toBe(hash2);
   });
 

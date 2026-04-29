@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -8,15 +8,15 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { useService } from '@/services/di/provider';
 import type { AnimalSceneAsset } from '@/services/animal-scene/types';
-import { contrastSecondaryColor, contrastTextColor } from '@/shared/theme/contrast';
+import { useService } from '@/services/di/provider';
 import { theme } from '@/shared/theme';
+import { contrastSecondaryColor, contrastTextColor } from '@/shared/theme/contrast';
 
-import type { AnimalInfo } from '../content/types';
 
 import { AnimalChat } from './animal-chat';
 import { AnimalScene } from './animal-scene';
+import type { AnimalInfo } from '../content/types';
 
 interface AnimalRevealCardProps {
   readonly animal: AnimalInfo;
@@ -37,6 +37,10 @@ export function AnimalRevealCard({
 }: AnimalRevealCardProps) {
   const sceneService = useService('animalScene');
   const [sceneReady, setSceneReady] = useState(false);
+  const { width: screenWidth } = useWindowDimensions();
+  // Лоадер не должен быть шире доступной ширины с учётом padding контейнера
+  // (theme.spacing.xl ≈ 24, по 2 стороны → -48). На широких экранах ограничен 320.
+  const loaderSize = Math.max(180, Math.min(320, screenWidth - 48));
 
   const asset = useMemo<AnimalSceneAsset>(
     () => ({ id: animal.id, title: animal.title, emoji: animal.emoji, color: animal.color }),
@@ -134,7 +138,7 @@ export function AnimalRevealCard({
       {sceneReady ? (
         <AnimalScene asset={asset} animation="greet" />
       ) : (
-        <View style={styles.loader}>
+        <View style={[styles.loader, { width: loaderSize, height: loaderSize }]}>
           <Text style={styles.loaderText}>Готовим сцену…</Text>
         </View>
       )}
@@ -164,8 +168,7 @@ const styles = StyleSheet.create({
     gap: theme.spacing.lg,
   },
   loader: {
-    width: 320,
-    height: 320,
+    // width/height задаются динамически от ширины экрана
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: theme.radii.lg,

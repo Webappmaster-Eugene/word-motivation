@@ -16,7 +16,7 @@ import type { SpeechSynthesisService, TtsEvent, TtsSpeakOptions } from './types'
  * Скоринг — простой regex-набор по `name`/`identifier`. Чем выше оценка, тем
  * приоритетнее. Совпадения кумулятивны (женский + premium > только женский).
  */
-const VOICE_PREFERENCES: ReadonlyArray<{ readonly pattern: RegExp; readonly bonus: number }> = [
+const VOICE_PREFERENCES: readonly { readonly pattern: RegExp; readonly bonus: number }[] = [
   { pattern: /premium|enhanced/i, bonus: 40 },
   { pattern: /neural|natural/i, bonus: 30 },
   { pattern: /google/i, bonus: 35 },

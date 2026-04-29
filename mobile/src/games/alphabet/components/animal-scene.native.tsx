@@ -1,6 +1,6 @@
-import { Camera, DefaultLight, FilamentScene, FilamentView, Model } from 'react-native-filament';
 import { useEffect, useMemo } from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Camera, DefaultLight, FilamentScene, FilamentView, Model } from 'react-native-filament';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -12,8 +12,8 @@ import Animated, {
 
 import type { Biome } from '@/games/alphabet/content/types';
 import type { AnimalSceneAsset, SceneAnimation } from '@/services/animal-scene/types';
-import { contrastTextColor } from '@/shared/theme/contrast';
 import { theme } from '@/shared/theme';
+import { contrastTextColor } from '@/shared/theme/contrast';
 
 interface AnimalSceneProps {
   readonly asset: AnimalSceneAsset & { readonly biome?: Biome };
@@ -23,8 +23,6 @@ interface AnimalSceneProps {
   /** Скрыть заголовок (дубликат с hero-banner'ом снаружи). */
   readonly showTitle?: boolean;
 }
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 // Placeholder GLB по биомам (см. tools/generate-primitive-glb.js).
 // Когда будут Quaternius-модели — маппим per-animal.
@@ -54,10 +52,12 @@ const AnimatedText = Animated.createAnimatedComponent(Text);
 export function AnimalScene({
   asset,
   animation: _animation = 'greet',
-  width = Math.min(SCREEN_WIDTH - 48, 360),
+  width: widthProp,
   height = 320,
   showTitle = true,
 }: AnimalSceneProps) {
+  const { width: windowWidth } = useWindowDimensions();
+  const width = widthProp ?? Math.min(windowWidth - 48, 360);
   const biome = asset.biome ?? 'FOREST';
   const modelSource = CUBE_BY_BIOME[biome] ?? CUBE_BY_BIOME.FOREST;
 

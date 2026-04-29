@@ -1,4 +1,6 @@
+import type * as SecureStoreType from 'expo-secure-store';
 import { Platform } from 'react-native';
+
 
 /**
  * Персистентное хранилище deviceId.
@@ -8,6 +10,7 @@ import { Platform } from 'react-native';
  *
  * SecureStore импортируется только на native через require внутри функций,
  * чтобы Metro при web-сборке не тянул нативный модуль в бандл.
+ * `import type` для типов безопасен — стирается компилятором до Metro-резолва.
  */
 
 export interface DeviceStorage {
@@ -28,8 +31,8 @@ function hasLocalStorage(): boolean {
 }
 
 async function getFromSecureStore(): Promise<string | null> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const SecureStore = require('expo-secure-store') as typeof import('expo-secure-store');
+   
+  const SecureStore = require('expo-secure-store') as typeof SecureStoreType;
   try {
     return await SecureStore.getItemAsync(DEVICE_ID_KEY);
   } catch {
@@ -38,8 +41,8 @@ async function getFromSecureStore(): Promise<string | null> {
 }
 
 async function setToSecureStore(value: string): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const SecureStore = require('expo-secure-store') as typeof import('expo-secure-store');
+   
+  const SecureStore = require('expo-secure-store') as typeof SecureStoreType;
   await SecureStore.setItemAsync(DEVICE_ID_KEY, value, {
     keychainAccessible: SecureStore.WHEN_UNLOCKED,
   });

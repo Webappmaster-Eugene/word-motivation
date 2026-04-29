@@ -3,8 +3,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BIOME_RU } from '@/games/alphabet/content/types';
-import { navigateHome } from '@/shared/ui/nav';
 import { theme } from '@/shared/theme';
+import { navigateHome } from '@/shared/ui/nav';
 
 import { AnimalTile } from './components/animal-tile';
 import { useZooData } from './hooks/use-zoo-data';

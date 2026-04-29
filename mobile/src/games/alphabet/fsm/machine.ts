@@ -1,7 +1,5 @@
 import { assign, setup } from 'xstate';
 
-import { WORD_PACK } from '../content/words';
-import { isSpecialLetter } from '../content/special-letters';
 
 import { currentLetter, currentWord, isLetterMatch, isWordMatch } from './guards';
 import {
@@ -10,6 +8,8 @@ import {
   type AlphabetContext,
   type AlphabetEvent,
 } from './types';
+import { isSpecialLetter } from '../content/special-letters';
+import { WORD_PACK } from '../content/words';
 
 const initialContext: AlphabetContext = {
   words: WORD_PACK,

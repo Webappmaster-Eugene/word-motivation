@@ -1,17 +1,23 @@
+import type * as ExpoSpeechRecognition from 'expo-speech-recognition';
+import type {
+  ExpoSpeechRecognitionErrorCode,
+  ExpoSpeechRecognitionNativeEventMap,
+} from 'expo-speech-recognition';
 import { AppState } from 'react-native';
 import type { AppStateStatus, NativeEventSubscription } from 'react-native';
+
 
 import type { AsrEvent, AsrStartOptions, SpeechRecognitionService } from './types';
 
 type Subscription = { remove: () => void };
 
-type ExpoSpeechRecognitionApi = typeof import('expo-speech-recognition');
+type ExpoSpeechRecognitionApi = typeof ExpoSpeechRecognition;
 type ExpoSpeechRecognitionModuleType = ExpoSpeechRecognitionApi['ExpoSpeechRecognitionModule'];
-type NativeEventMap = import('expo-speech-recognition').ExpoSpeechRecognitionNativeEventMap;
+type NativeEventMap = ExpoSpeechRecognitionNativeEventMap;
 type NativeEvents = {
   [K in keyof NativeEventMap]: (event: NativeEventMap[K]) => void;
 };
-type ErrorCode = import('expo-speech-recognition').ExpoSpeechRecognitionErrorCode;
+type ErrorCode = ExpoSpeechRecognitionErrorCode;
 
 const SETTLE_AFTER_ABORT_MS = 50;
 
@@ -56,7 +62,7 @@ export class ExpoSpeechRecognitionAsr implements SpeechRecognitionService {
     let loadError: string | null = null;
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
+       
       const lib = require('expo-speech-recognition') as ExpoSpeechRecognitionApi;
       module = lib.ExpoSpeechRecognitionModule ?? null;
       if (!module) {

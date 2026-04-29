@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  FlatList,
   KeyboardAvoidingView,
+  type ListRenderItem,
   Platform,
   Pressable,
   ScrollView,
@@ -14,9 +16,9 @@ import { useService } from '@/services/di/provider';
 import type { ChatHistoryEntry } from '@/services/llm-chat/llm-chat';
 import { theme } from '@/shared/theme';
 
+import { TypingIndicator } from './typing-indicator';
 import type { AnimalInfo } from '../content/types';
 
-import { TypingIndicator } from './typing-indicator';
 
 interface AnimalChatProps {
   readonly sessionId: string | null;
@@ -41,6 +43,14 @@ type LocalMessage =
   | { readonly kind: 'greeting'; readonly content: string }
   | (ChatHistoryEntry & { readonly kind: 'chat' });
 
+// Стабильный id сообщения для FlatList. Индекс монотонно растёт (новые
+// сообщения только append), поэтому достаточно `${idx}-${kind}` —
+// перестановок не бывает. Если когда-нибудь добавим re-ordering,
+// нужен будет настоящий uuid в LocalMessage.
+function messageKey(idx: number, msg: LocalMessage): string {
+  return `${idx}-${msg.kind}`;
+}
+
 export function AnimalChat({ sessionId, animal }: AnimalChatProps) {
   const llm = useService('llmChat');
   const tts = useService('speechSynthesis');
@@ -51,10 +61,15 @@ export function AnimalChat({ sessionId, animal }: AnimalChatProps) {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const listRef = useRef<FlatList<LocalMessage>>(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollToEnd({ animated: true });
+    // requestAnimationFrame — даём FlatList отрисовать новый item, иначе
+    // scrollToEnd срабатывает до layout и не докручивает до конца.
+    const id = requestAnimationFrame(() => {
+      listRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => cancelAnimationFrame(id);
   }, [messages.length, sending]);
 
   const canSend =
@@ -109,63 +124,88 @@ export function AnimalChat({ sessionId, animal }: AnimalChatProps) {
     void sendText(input.trim());
   };
 
+  const renderMessage = useCallback<ListRenderItem<LocalMessage>>(
+    ({ item: msg }) => {
+      const isUser = msg.kind === 'chat' && msg.role === 'user';
+      return (
+        <View
+          style={[
+            styles.bubbleRow,
+            isUser ? styles.bubbleRowUser : styles.bubbleRowAnimal,
+          ]}
+          accessibilityLabel={isUser ? 'Ты' : animal.title}
+        >
+          {!isUser ? (
+            <Text style={styles.animalAvatar} accessibilityElementsHidden>
+              {animal.emoji}
+            </Text>
+          ) : null}
+          <View
+            style={[
+              styles.bubble,
+              isUser ? styles.bubbleUser : styles.bubbleAssistant,
+            ]}
+          >
+            <Text style={[styles.bubbleText, isUser && styles.bubbleTextUser]}>
+              {msg.content}
+            </Text>
+          </View>
+        </View>
+      );
+    },
+    [animal.title, animal.emoji],
+  );
+
+  const keyExtractor = useCallback(
+    (item: LocalMessage, index: number) => messageKey(index, item),
+    [],
+  );
+
+  // sending/error — в footer'е, чтобы не примешивать их к данным FlatList
+  // (иначе keyExtractor усложняется и item-recycling ломается).
+  const ListFooter = (
+    <>
+      {sending ? (
+        <View style={[styles.bubbleRow, styles.bubbleRowAnimal]}>
+          <Text style={styles.animalAvatar} accessibilityElementsHidden>
+            {animal.emoji}
+          </Text>
+          <View style={[styles.bubble, styles.bubbleAssistant, styles.thinkingBubble]}>
+            <TypingIndicator />
+          </View>
+        </View>
+      ) : null}
+      {error ? (
+        <View style={styles.errorBubble} accessibilityRole="alert">
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      ) : null}
+    </>
+  );
+
   return (
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
-      <ScrollView
-        ref={scrollRef}
+      <FlatList
+        ref={listRef}
+        data={messages}
+        renderItem={renderMessage}
+        keyExtractor={keyExtractor}
+        ListFooterComponent={ListFooter}
         style={styles.list}
         contentContainerStyle={styles.listContent}
         keyboardShouldPersistTaps="handled"
-      >
-        {messages.map((msg, idx) => {
-          const isUser = msg.kind === 'chat' && msg.role === 'user';
-          return (
-            <View
-              key={`${idx}-${msg.kind}`}
-              style={[
-                styles.bubbleRow,
-                isUser ? styles.bubbleRowUser : styles.bubbleRowAnimal,
-              ]}
-              accessibilityLabel={isUser ? 'Ты' : animal.title}
-            >
-              {!isUser ? (
-                <Text style={styles.animalAvatar} accessibilityElementsHidden>
-                  {animal.emoji}
-                </Text>
-              ) : null}
-              <View
-                style={[
-                  styles.bubble,
-                  isUser ? styles.bubbleUser : styles.bubbleAssistant,
-                ]}
-              >
-                <Text style={[styles.bubbleText, isUser && styles.bubbleTextUser]}>
-                  {msg.content}
-                </Text>
-              </View>
-            </View>
-          );
-        })}
-        {sending ? (
-          <View style={[styles.bubbleRow, styles.bubbleRowAnimal]}>
-            <Text style={styles.animalAvatar} accessibilityElementsHidden>
-              {animal.emoji}
-            </Text>
-            <View style={[styles.bubble, styles.bubbleAssistant, styles.thinkingBubble]}>
-              <TypingIndicator />
-            </View>
-          </View>
-        ) : null}
-        {error ? (
-          <View style={styles.errorBubble} accessibilityRole="alert">
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : null}
-      </ScrollView>
+        // На длинных диалогах оставляем небольшое окно отрисовки —
+        // FlatList по дефолту переиспользует ячейки и не держит все 100+
+        // сообщений в дереве одновременно.
+        initialNumToRender={12}
+        maxToRenderPerBatch={8}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS !== 'web'}
+      />
 
       {/* Чипы-готовых-вопросов — помогают ребёнку начать диалог без клавиатуры */}
       <ScrollView

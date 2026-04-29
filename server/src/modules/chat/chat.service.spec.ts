@@ -41,10 +41,10 @@ describe('ChatService', () => {
     svc = module.get(ChatService);
   });
 
-  function arrangeSession(childId = 'c1') {
+  function arrangeSession(childId = 'c1'): void {
     sessionFindUnique.mockResolvedValue({ id: 's1', childId });
   }
-  function arrangeAnimal() {
+  function arrangeAnimal(): void {
     animalFindUnique.mockResolvedValue({
       id: 'dog',
       title: 'Собака',

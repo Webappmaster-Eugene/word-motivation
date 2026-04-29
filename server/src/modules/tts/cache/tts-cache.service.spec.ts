@@ -7,7 +7,9 @@ import { Test } from '@nestjs/testing';
 
 import { TtsCacheService } from './tts-cache.service';
 
-function mockConfig(overrides: Partial<{ dir: string; limitMb: number; enabled: boolean }>) {
+function mockConfig(
+  overrides: Partial<{ dir: string; limitMb: number; enabled: boolean }>,
+): ConfigService {
   return {
     get: (key: string) => {
       if (key === 'TTS_CACHE_DIR') return overrides.dir ?? '/tmp/tts-nonexistent';
@@ -89,7 +91,7 @@ describe('TtsCacheService', () => {
     const hash = svc.hashKey({ text: 'parallel', voice: 'xenia', rate: 1 });
     let producerCalls = 0;
     const audio = Buffer.alloc(512, 1);
-    const producer = async () => {
+    const producer = async (): ReturnType<typeof svc.store> => {
       producerCalls += 1;
       await new Promise((r) => setTimeout(r, 30));
       return svc.store(hash, audio);

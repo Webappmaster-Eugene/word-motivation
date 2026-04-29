@@ -26,7 +26,9 @@ export class AnimalPresenter {
     this.systemPrompt = animal.systemPrompt;
     // scriptedReplies — JSON колонка, кастим на string[] (предусматриваем defensive-default)
     this.scriptedReplies = Array.isArray(animal.scriptedReplies)
-      ? (animal.scriptedReplies.filter((x): x is string => typeof x === 'string') as readonly string[])
+      ? (animal.scriptedReplies.filter(
+          (x): x is string => typeof x === 'string',
+        ) as readonly string[])
       : [];
     this.license = animal.license;
     this.attribution = animal.attribution;

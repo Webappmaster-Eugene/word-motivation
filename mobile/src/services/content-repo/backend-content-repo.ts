@@ -1,12 +1,12 @@
-import type { ApiClient } from '@/services/api-client/api-client';
-import type { DeviceAuthService } from '@/services/auth/device-auth-service';
-
 import type {
   AnimalInfo,
   AnimalId,
   Biome,
   WordEntry,
 } from '@/games/alphabet/content/types';
+import type { ApiClient } from '@/services/api-client/api-client';
+import type { DeviceAuthService } from '@/services/auth/device-auth-service';
+
 
 import type { AlphabetContent, ContentRepo } from './types';
 

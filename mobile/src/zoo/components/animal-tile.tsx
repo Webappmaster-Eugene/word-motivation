@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { contrastTextColor } from '@/shared/theme/contrast';
 import { theme } from '@/shared/theme';
+import { contrastTextColor } from '@/shared/theme/contrast';
 
 import type { ZooAnimal } from '../hooks/use-zoo-data';
 

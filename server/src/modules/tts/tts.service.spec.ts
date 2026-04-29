@@ -16,7 +16,7 @@ function makeCachedEntry(hash: string, size: number): CachedEntry {
   };
 }
 
-function mockConfig(overrides: { enabled: boolean; voice: string }) {
+function mockConfig(overrides: { enabled: boolean; voice: string }): ConfigService {
   return {
     get: (key: string) => {
       if (key === 'TTS_ENABLED') return overrides.enabled;
@@ -123,9 +123,7 @@ describe('TtsService', () => {
     expect(synthesizer.synthesize).toHaveBeenCalledWith(expect.objectContaining({ rate: 1.5 }));
 
     await service.synthesize({ text: 't', rate: 0.01 });
-    expect(synthesizer.synthesize).toHaveBeenLastCalledWith(
-      expect.objectContaining({ rate: 0.5 }),
-    );
+    expect(synthesizer.synthesize).toHaveBeenLastCalledWith(expect.objectContaining({ rate: 0.5 }));
   });
 
   it('503 при TTS_ENABLED=false', async () => {

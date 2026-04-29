@@ -235,7 +235,7 @@ export class ServerTts implements SpeechSynthesisService {
     err: unknown,
   ): Promise<void> {
     if (__DEV__) {
-      // eslint-disable-next-line no-console
+       
       console.warn(`ServerTts: ${stage}, падаем на fallback.`, err);
     }
     // Особый кейс: 429 / 503 — не шумим в логах, это ожидаемые ситуации
@@ -264,7 +264,7 @@ export class ServerTts implements SpeechSynthesisService {
       });
     } catch (err) {
       if (__DEV__) {
-        // eslint-disable-next-line no-console
+         
         console.warn('ServerTts: setAudioModeAsync не сработал', err);
       }
     }

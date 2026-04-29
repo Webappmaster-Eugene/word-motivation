@@ -77,9 +77,5 @@ export class ModerationService {
 }
 
 function normalise(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/ё/g, 'е')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return text.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
 }

@@ -6,8 +6,8 @@ import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from '
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useService } from '@/services/di/provider';
-import { navigateHome } from '@/shared/ui/nav';
 import { theme } from '@/shared/theme';
+import { navigateHome } from '@/shared/ui/nav';
 
 function appVersion(): string {
   return Constants.expoConfig?.version ?? '0.0.0';
@@ -46,7 +46,7 @@ export default function SettingsScreen() {
         await progressApi.resetProgress();
       } catch (err) {
         if (__DEV__) {
-          // eslint-disable-next-line no-console
+           
           console.warn('Серверный сброс прогресса недоступен:', err);
         }
       }

@@ -1,4 +1,6 @@
+import type * as SecureStoreType from 'expo-secure-store';
 import { Platform } from 'react-native';
+
 
 /**
  * Generic key-value storage для mobile и web.
@@ -6,6 +8,7 @@ import { Platform } from 'react-native';
  *  - web: localStorage с in-memory fallback на Private Mode.
  *
  * Значения — произвольные JSON-сериализуемые объекты.
+ * `import type` стирается компилятором — Metro не резолвит native-модуль.
  */
 
 export interface KvStorage {
@@ -35,8 +38,8 @@ async function rawGet(key: string): Promise<string | null> {
     }
     return memoryFallback.get(key) ?? null;
   }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const SecureStore = require('expo-secure-store') as typeof import('expo-secure-store');
+   
+  const SecureStore = require('expo-secure-store') as typeof SecureStoreType;
   try {
     return await SecureStore.getItemAsync(key);
   } catch {
@@ -56,8 +59,8 @@ async function rawSet(key: string, value: string): Promise<void> {
     }
     return;
   }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const SecureStore = require('expo-secure-store') as typeof import('expo-secure-store');
+   
+  const SecureStore = require('expo-secure-store') as typeof SecureStoreType;
   await SecureStore.setItemAsync(key, value, {
     keychainAccessible: SecureStore.WHEN_UNLOCKED,
   });
@@ -75,8 +78,8 @@ async function rawDelete(key: string): Promise<void> {
     }
     return;
   }
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const SecureStore = require('expo-secure-store') as typeof import('expo-secure-store');
+   
+  const SecureStore = require('expo-secure-store') as typeof SecureStoreType;
   try {
     await SecureStore.deleteItemAsync(key);
   } catch {

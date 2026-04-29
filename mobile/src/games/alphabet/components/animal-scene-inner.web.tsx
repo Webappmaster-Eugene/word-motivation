@@ -8,7 +8,7 @@ import {
   vec,
 } from '@shopify/react-native-skia';
 import { useEffect, useMemo } from 'react';
-import { Dimensions, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -35,8 +35,6 @@ export interface AnimalSceneInnerProps {
    */
   readonly showTitle?: boolean;
 }
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace('#', '');
@@ -89,10 +87,12 @@ const AnimatedText = Animated.createAnimatedComponent(Text);
 export default function AnimalSceneInner({
   asset,
   animation = 'greet',
-  width = Math.min(SCREEN_WIDTH - 48, 360),
+  width: widthProp,
   height = 320,
   showTitle = true,
 }: AnimalSceneInnerProps) {
+  const { width: windowWidth } = useWindowDimensions();
+  const width = widthProp ?? Math.min(windowWidth - 48, 360);
   const emojiScale = useSharedValue(0.6);
   const emojiTranslateY = useSharedValue(0);
   const emojiRotate = useSharedValue(0);
