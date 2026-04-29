@@ -2,8 +2,11 @@
   "expo": {
     "extra": {
       "eas": {
-        "projectId": "a4b5ef00-e309-4645-818e-c1aefba0387c"
-      }
-    }
+        "projectId": "a0813d8c-be9f-4917-9f9b-904325cfafcf"
+      },
+      "ttsMode": "server",
+      "router": {}
+    },
+    "owner": "numnumich"
   }
 }
