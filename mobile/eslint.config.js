@@ -1,14 +1,5 @@
-// ESLint v9 flat-config. Старый `.eslintrc.js` (extends: 'expo') обёрнут
-// через FlatCompat, потому что `eslint-config-expo@8` ещё legacy-формат.
-// При апгрейде до eslint-config-expo c flat-экспортом — заменить compat
-// на прямой `...require('eslint-config-expo/flat')`.
-const { FlatCompat } = require('@eslint/eslintrc');
-const js = require('@eslint/js');
-
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  recommendedConfig: js.configs.recommended,
-});
+// ESLint v9 flat-config. eslint-config-expo@10 экспортирует flat напрямую.
+const expoFlat = require('eslint-config-expo/flat');
 
 module.exports = [
   {
@@ -28,7 +19,7 @@ module.exports = [
       'app.config.ts',
     ],
   },
-  ...compat.extends('expo'),
+  ...expoFlat,
   {
     rules: {
       '@typescript-eslint/consistent-type-imports': ['warn', { prefer: 'type-imports' }],
@@ -44,6 +35,22 @@ module.exports = [
           alphabetize: { order: 'asc', caseInsensitive: true },
         },
       ],
+    },
+  },
+  {
+    // Asset-require и Platform-conditional require — идиоматичные паттерны RN
+    // и обязательные web-fallback'и (см. .claude/rules/frontend.md). ESM-импорт
+    // здесь сломал бы web-бандл: Metro попытался бы зарезолвить native-only
+    // модули (expo-secure-store, expo-speech-recognition).
+    files: [
+      'src/games/alphabet/components/animal-scene.native.tsx',
+      'src/services/auth/device-storage.ts',
+      'src/services/di/container.ts',
+      'src/services/speech-recognition/expo-speech-recognition-asr.ts',
+      'src/services/storage/kv-storage.ts',
+    ],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
 ];

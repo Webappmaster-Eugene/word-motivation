@@ -1,8 +1,4 @@
 import type * as ExpoSpeechRecognition from 'expo-speech-recognition';
-import type {
-  ExpoSpeechRecognitionErrorCode,
-  ExpoSpeechRecognitionNativeEventMap,
-} from 'expo-speech-recognition';
 import { AppState } from 'react-native';
 import type { AppStateStatus, NativeEventSubscription } from 'react-native';
 
@@ -13,11 +9,11 @@ type Subscription = { remove: () => void };
 
 type ExpoSpeechRecognitionApi = typeof ExpoSpeechRecognition;
 type ExpoSpeechRecognitionModuleType = ExpoSpeechRecognitionApi['ExpoSpeechRecognitionModule'];
-type NativeEventMap = ExpoSpeechRecognitionNativeEventMap;
+type NativeEventMap = ExpoSpeechRecognition.ExpoSpeechRecognitionNativeEventMap;
 type NativeEvents = {
   [K in keyof NativeEventMap]: (event: NativeEventMap[K]) => void;
 };
-type ErrorCode = ExpoSpeechRecognitionErrorCode;
+type ErrorCode = ExpoSpeechRecognition.ExpoSpeechRecognitionErrorCode;
 
 const SETTLE_AFTER_ABORT_MS = 50;
 
